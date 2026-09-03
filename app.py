@@ -27,8 +27,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-# Gemini SDK is optional at import time — the app must still run (in
-# "offline template mode") even if the package or API key isn't set up yet.
+
 try:
     import google.generativeai as genai
     GEMINI_SDK_AVAILABLE = True
@@ -36,27 +35,22 @@ except ImportError:
     GEMINI_SDK_AVAILABLE = False
 
 
-# ==============================================================================
-# SECTION 0: APP-WIDE CONFIGURATION
-# ==============================================================================
 
 DB_PATH = "manorakshak.db"
 
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
 
-# Departments shown at login — used ONLY for anonymized unit-level admin
-# analytics. Edit this list to match your organization's structure.
+
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
 
-# Change this before any real deployment. Best practice: set it via
-# st.secrets["ADMIN_PASSWORD"] instead of hardcoding it here.
+
 DEFAULT_ADMIN_PASSWORD = "manorakshak_admin"
 
-# Confidential crisis resources shown throughout the app.
+
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
     {"name": "KIRAN Mental Health Helpline (Ministry of Social Justice)", "number": "1800-599-0019"},
@@ -65,11 +59,7 @@ HELPLINES = [
 ]
 
 
-# ==============================================================================
-# SECTION 1: DATABASE LAYER (SQLite)
-# ==============================================================================
-# Everything the app persists lives in one table. Keeping it flat and simple
-# makes it easy for a non-DBA to inspect with any SQLite viewer.
+
 
 def get_connection():
     """Open a fresh connection. SQLite connections are cheap, so we open
@@ -152,17 +142,7 @@ def hash_pseudonym(raw_id: str) -> str:
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
 
 
-# ==============================================================================
-# SECTION 2: THE SCREENER — QUESTIONS & SCORING LOGIC
-# ==============================================================================
-# This adapts the clinically standardized PHQ-4 (ultra-brief depression /
-# anxiety screener) and adds duty-specific items inspired by occupational
-# stress and Brief-COPE literature, tailored to law-enforcement / armed
-# forces realities: shift fatigue, traumatic incident exposure, isolation
-# from family, hypervigilance, and emotional suppression.
-#
-# NON-PROGRAMMERS: to add/remove/edit a question, just edit this list.
-# Each question is answered on the same 0–3 scale, defined in ANSWER_SCALE.
+
 
 ANSWER_SCALE = [
     "Not at all",
@@ -172,7 +152,7 @@ ANSWER_SCALE = [
 ]
 
 QUESTIONS = [
-    # --- Adapted PHQ-4 core items (depression / anxiety) ---
+  
     {
         "id": "q1",
         "text": "Little interest or pleasure in doing things you'd normally enjoy, on or off duty",
@@ -228,7 +208,7 @@ QUESTIONS = [
 
 MAX_SCORE = len(QUESTIONS) * 3  # 30
 
-# Category thresholds — tune these if your organization uses different cutoffs.
+
 SCORE_CATEGORIES = [
     (0, 7, "Low Stress", "🟢"),
     (8, 14, "Moderate Fatigue", "🟡"),
@@ -245,9 +225,7 @@ def score_to_category(total_score: int):
     return "Unknown", "⚪"
 
 
-# ==============================================================================
-# SECTION 3: STATIC WELLNESS RESOURCES (shown on the Dashboard)
-# ==============================================================================
+
 
 SOP_RESETS = [
     "**Box Breathing (Tactical Reset):** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4–6 cycles before/after a high-stress call.",
@@ -258,19 +236,7 @@ SOP_RESETS = [
 ]
 
 
-# ==============================================================================
-# SECTION 4: AI OFFICER CARE COMPANION — "Rakshak Sahayak" (Gemini Integration)
-# ==============================================================================
-# HOW TO PLUG IN YOUR GEMINI API KEY:
-#   Option A (recommended for Streamlit Cloud):
-#     Create a file .streamlit/secrets.toml with:
-#         GEMINI_API_KEY = "your-key-here"
-#   Option B (local dev): set an environment variable before running:
-#         export GEMINI_API_KEY="your-key-here"      (Mac/Linux)
-#         set GEMINI_API_KEY="your-key-here"          (Windows)
-#
-# If no key is found, the app automatically falls back to a template-based
-# "offline mode" response so the demo still works end-to-end.
+
 
 def get_gemini_api_key():
     """Look for the API key in Streamlit secrets first, then env vars."""
@@ -278,7 +244,7 @@ def get_gemini_api_key():
         if "GEMINI_API_KEY" in st.secrets:
             return st.secrets["GEMINI_API_KEY"]
     except Exception:
-        pass  # st.secrets raises if no secrets.toml exists at all — that's fine
+        pass  
     return os.environ.get("GEMINI_API_KEY", "")
 
 
@@ -305,7 +271,7 @@ readiness, not weakness. Do not be preachy about this — one sentence is enough
 def build_gemini_prompt(category: str, responses: dict) -> str:
     """Construct the prompt sent to Gemini, summarizing which duty-related
     challenges scored highest so the response feels specifically tailored."""
-    # Identify the officer's top 3 highest-scoring (most concerning) domains
+    
     scored_items = sorted(responses.items(), key=lambda kv: kv[1]["score"], reverse=True)
     top_concerns = scored_items[:3]
     concerns_text = "\n".join(
@@ -381,9 +347,6 @@ def _offline_debrief(category: str) -> str:
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
 
-# ==============================================================================
-# SECTION 5: STREAMLIT APP — PAGE CONFIG & SESSION STATE
-# ==============================================================================
 
 st.set_page_config(
     page_title="ManoRakshak",
@@ -402,9 +365,6 @@ if "department" not in st.session_state:
     st.session_state.department = ""
 
 
-# ==============================================================================
-# SECTION 6: SIDEBAR — ANONYMOUS / PSEUDONYM LOGIN
-# ==============================================================================
 
 with st.sidebar:
     st.markdown("## 🛡️ ManoRakshak")
@@ -444,9 +404,6 @@ with st.sidebar:
         st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
 
 
-# ==============================================================================
-# SECTION 7: MAIN AREA
-# ==============================================================================
 
 st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
@@ -473,9 +430,6 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
 )
 
 
-# ------------------------------------------------------------------------------
-# TAB 1: THE SCREENER + AI DEBRIEF
-# ------------------------------------------------------------------------------
 with tab_assess:
     st.subheader("Confidential Duty Wellness Check-In")
     st.caption(
@@ -503,7 +457,7 @@ with tab_assess:
         submitted = st.form_submit_button("✅ Submit Confidential Check-In", type="primary", use_container_width=True)
 
     if submitted:
-        # Validate every question was answered
+   
         unanswered = [q["text"] for q in QUESTIONS if responses[q["id"]]["score"] is None]
         if unanswered:
             st.error("Please answer every question before submitting. You've missed: " + "; ".join(unanswered))
@@ -542,9 +496,7 @@ with tab_assess:
             st.success("This check-in has been saved to your private wellness trend below (see 'My Dashboard' tab).")
 
 
-# ------------------------------------------------------------------------------
-# TAB 2: PERSONAL DASHBOARD + RESOURCE BANK
-# ------------------------------------------------------------------------------
+
 with tab_dashboard:
     st.subheader("📈 Your Wellness Trend")
 
@@ -583,9 +535,7 @@ with tab_dashboard:
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
 
-# ------------------------------------------------------------------------------
-# TAB 3: ADMIN / COMMAND-LEVEL ANALYTICS (password protected, fully anonymized)
-# ------------------------------------------------------------------------------
+
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -596,9 +546,7 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-    # Best practice: set ADMIN_PASSWORD in st.secrets rather than relying on
-    # the hardcoded default below. Change DEFAULT_ADMIN_PASSWORD before any
-    # real deployment.
+    
     try:
         expected_password = st.secrets.get("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
     except Exception:
