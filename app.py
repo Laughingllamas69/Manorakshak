@@ -465,8 +465,7 @@ with tab_assess:
                 st.session_state.processing = True
                 st.rerun()
 
-    # Processing Block
-        # Processing Block
+       # Processing Block
     if st.session_state.get("processing"):
         # 1. Calculate Score
         total_score = sum(v for v in st.session_state.answers.values() if v is not None)
@@ -486,7 +485,7 @@ with tab_assess:
         with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
             ai_text = get_ai_debrief(category, ai_input)
 
-        # 4. Save to DB
+        # 4. Save to DB (only once)
         save_assessment(
             st.session_state.user_id,
             st.session_state.department,
@@ -496,16 +495,19 @@ with tab_assess:
             ai_text,
         )
 
-        # 5. Show Results
+        # 5. Stop the loop BEFORE rendering
+        st.session_state.processing = False
+
+        # 6. Show Results
         st.divider()
-        st.markdown(f"## {emoji} Result: **{category}**")
+        st.markdown(f"## {emoji} Your Result: **{category}**")
         st.progress(min(total_score / MAX_SCORE, 1.0))
         st.caption(f"Score: {total_score} / {MAX_SCORE}")
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
         st.markdown(
             f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         if category == "Critical Distress":
@@ -516,14 +518,18 @@ with tab_assess:
                 "You do not have to face this alone."
             )
 
-        st.success("This check-in has been saved. You can close this tab or go to your Dashboard.")
+        st.success("This check-in has been saved to your private wellness trend.")
 
-        # 6. Reset State
-        st.session_state.answers = {}
-        st.session_state.q_index = 0
-        st.session_state.processing = False
-        st.rerun()
-
+        # 7. Buttons instead of auto-rerun
+        b1, b2 = st.columns(2)
+        if b1.button("🔄 Take check-in again", use_container_width=True):
+            st.session_state.answers = {}
+            st.session_state.q_index = 0
+            st.rerun()
+        if b2.button("📊 Go to my dashboard", use_container_width=True):
+            st.session_state.answers = {}
+            st.session_state.q_index = 0
+            st.rerun()
 # --- TAB 2: DASHBOARD ---
 with tab_dashboard:
     # Guard: Check if logged in
