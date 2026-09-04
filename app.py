@@ -10,7 +10,7 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-from groq import Groq
+import requests
 # Import the UI functions we just created
 from app_ui import inject_css, hero_header
 
