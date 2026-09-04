@@ -15,7 +15,7 @@ import streamlit as st
 from app_ui import inject_css, hero_header
 
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_SDK_AVAILABLE = True
 except ImportError:
     GEMINI_SDK_AVAILABLE = False
