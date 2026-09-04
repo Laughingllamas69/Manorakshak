@@ -346,10 +346,11 @@ with st.sidebar:
                 st.rerun()
             else:
                 st.warning("Please enter a badge number or pseudonym to continue.")
-    else:
+      else:
         st.success(f"Signed in as **{st.session_state.user_id}**")
         st.caption(f"Department: {st.session_state.department}")
-            if st.button("🚪 End Session", use_container_width=True):
+        
+        if st.button("🚪 End Session", use_container_width=True):
             # Clear all custom session state variables
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
@@ -620,10 +621,16 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
+      # Check if admin password is configured in secrets
+    if "ADMIN_PASSWORD" not in st.secrets:
+        st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
+        st.stop() # Stop execution immediately
+    
     try:
-        expected_password = st.secrets.get("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+        expected_password = st.secrets.get("ADMIN_PASSWORD")
     except Exception:
-        expected_password = DEFAULT_ADMIN_PASSWORD
+        st.error("Admin password not found in secrets.toml.")
+        st.stop()
 
     if admin_password == "":
         st.info("Enter the admin password to view aggregate analytics.")
