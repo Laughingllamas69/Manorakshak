@@ -235,16 +235,17 @@ def get_ai_debrief(category: str, responses: dict) -> str:
 
     if GEMINI_SDK_AVAILABLE and api_key:
         try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-3.6-flash")
+            client = genai.Client(api_key=api_key)
             prompt = build_gemini_prompt(category, responses)
-            result = model.generate_content(prompt)
-            return result.text.strip()
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
+            return response.text.strip()
         except Exception as e:
             return _offline_debrief(category) + f"\n\n*(AI companion note: live response unavailable — {e})*"
 
     return _offline_debrief(category)
-
 def _offline_debrief(category: str) -> str:
     templates = {
         "Low Stress": (
