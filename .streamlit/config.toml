@@ -1,16 +1,12 @@
-# .streamlit/config.toml
 [theme]
 base = "dark"
-primaryColor = "#E8A33D"          # muted saffron/amber
-backgroundColor = "#0E1420"        # deep navy-slate
+primaryColor = "#E8A33D"
+backgroundColor = "#0E1420"
 secondaryBackgroundColor = "#16202F"
 textColor = "#E6EAF0"
 linkColor = "#7FB2E5"
-borderColor = "#2A3547"       # see note below
+borderColor = "#2A3547"
 borderRadius = "12px"
-font = "Inter"
-headingFont = "Inter"
-codeFont = "JetBrains Mono"
 font = "'Inter', 'Noto Sans Devanagari', sans-serif"
 headingFont = "'Inter', 'Noto Sans Devanagari', sans-serif"
 
@@ -25,7 +21,5 @@ textColor = "#1B2430"
 backgroundColor = "#0A0F18"
 secondaryBackgroundColor = "#16202F"
 
-[server]
-maxUploadSize = 10
 [browser]
-gatherUsageStats = false           # important: you handle sensitive data
+gatherUsageStats = false
