@@ -259,7 +259,7 @@ def get_ai_debrief(category: str, responses: dict) -> str:
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=45,
+            timeout=30,
         )
         resp.raise_for_status()
         content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -349,12 +349,17 @@ with st.sidebar:
     else:
         st.success(f"Signed in as **{st.session_state.user_id}**")
         st.caption(f"Department: {st.session_state.department}")
-        if st.button("🚪 End Session", use_container_width=True):
+            if st.button("🚪 End Session", use_container_width=True):
+            # Clear all custom session state variables
+            for key in list(st.session_state.keys()):
+                if key not in ["logged_in", "user_id", "department"]:
+                    del st.session_state[key]
+            
+            # Reset core login state
             st.session_state.logged_in = False
             st.session_state.user_id = ""
             st.session_state.department = ""
             st.rerun()
-
     st.divider()
     st.markdown("#### 🚨 In Crisis Right Now?")
     for h in HELPLINES:
