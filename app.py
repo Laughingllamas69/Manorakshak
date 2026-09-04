@@ -348,15 +348,15 @@ def _offline_debrief(category: str) -> str:
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
 
-
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
-)
+    initial_sidebar_state="collapsed", 
 
+ 
 init_db()
+ inject_css()
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -410,20 +410,58 @@ st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
 
 if not st.session_state.logged_in:
-    st.info("👈 Please check in using the sidebar (a pseudonym is completely fine) to begin.")
-    st.markdown(
-        """
-        ### About ManoRakshak
-        ManoRakshak is a confidential, stigma-free wellness check-in tool built for
-        police and armed forces personnel. It offers:
-        - A **2-minute standardized wellness screener**, adapted for duty-related stress
-        - An **AI debriefing companion** offering grounding techniques and support
-        - A **personal wellness dashboard** to track your trend over time
-        - Direct access to **national crisis helplines**
-
-        No real names are ever required. Your privacy is the foundation of this tool.
-        """
+    hero_header(
+        "ManoRakshak",
+        "A confidential wellness check-in for police and armed forces personnel. "
+        "Two minutes. No names. No service record.",
+        chips=[
+            "🔒 Identity one-way hashed",
+            "🇮🇳 Tele-MANAS 14416 always one click away",
+            "📊 Command sees averages, never individuals",
+        ],
     )
+
+    left, right = st.columns([1.15, 1])
+
+    with left:
+        st.markdown("#### Begin your check-in")
+        st.caption(
+            "Use a badge number, service number, or any pseudonym you like. "
+            "It is hashed before it touches the database — admins cannot reverse it."
+        )
+        with st.form("checkin_form"):
+            raw_id = st.text_input(
+                "Badge number or pseudonym", placeholder="e.g. Falcon-07"
+            )
+            dept = st.selectbox("Department / Force", DEPARTMENTS)
+            go = st.form_submit_button(
+                "Enter confidentially  →",
+                use_container_width=True,
+                type="primary",
+            )
+        if go and raw_id.strip():
+            st.session_state.user_id = hash_pseudonym(raw_id)
+            st.session_state.department = dept
+            st.session_state.logged_in = True
+            st.rerun()
+        elif go:
+            st.warning("Please enter a badge number or pseudonym to continue.")
+
+    with right:
+        st.markdown("#### If you're in crisis right now")
+        st.markdown(
+            """
+            <div class="mr-crisis">
+              You do not need to complete a check-in to get help.<br><br>
+              <b>Tele-MANAS</b> &nbsp;·&nbsp; 14416 &nbsp;(24×7, free)<br>
+              <b>KIRAN</b> &nbsp;·&nbsp; 1800-599-0019<br>
+              <b>iCall (TISS)</b> &nbsp;·&nbsp; 9152987821
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Available in 20+ Indian languages. Confidential.")
+
     st.stop()
 
 tab_assess, tab_dashboard, tab_admin = st.tabs(
