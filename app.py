@@ -466,11 +466,19 @@ with tab_assess:
 
     # Processing Block
     if st.session_state.get("processing"):
-        total_score = sum(item["score"] for item in st.session_state.answers.values())
+                total_score = sum(st.session_state.answers.values())
         category, emoji = score_to_category(total_score)
         
         with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
-            ai_text = get_ai_debrief(category, st.session_state.answers)
+                   ai_input = {
+            q["id"]: {
+                "question": q["text"],
+                "domain": q["domain"],
+                "score": st.session_state.answers[q["id"]]
+            }
+            for q in QUESTIONS
+        }
+        ai_text = get_ai_debrief(category, ai_input)
         
         save_assessment(
             st.session_state.user_id,
@@ -478,7 +486,7 @@ with tab_assess:
             total_score,
             category,
             st.session_state.answers,
-            ai_text,
+             ai_input,
         )
         
         st.divider()
