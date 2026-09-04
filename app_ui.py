@@ -1,6 +1,6 @@
 # app_ui.py
 # This file contains the custom CSS styles for the Manorakshak app
-
+import streamlit as st
 _CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap');
