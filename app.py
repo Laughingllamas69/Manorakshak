@@ -469,7 +469,7 @@ with tab_assess:
         # Processing Block
     if st.session_state.get("processing"):
         # 1. Calculate Score
-        total_score = sum(st.session_state.answers.values())
+        total_score = sum(v for v in st.session_state.answers.values() if v is not None)
         category, emoji = score_to_category(total_score)
 
         # 2. Rebuild format for AI
