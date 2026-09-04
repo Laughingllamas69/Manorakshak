@@ -10,15 +10,10 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-
+import requests
 # Import the UI functions we just created
 from app_ui import inject_css, hero_header
 
-try:
-    from google import genai
-    GEMINI_SDK_AVAILABLE = True
-except ImportError:
-    GEMINI_SDK_AVAILABLE = False
 
 DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
@@ -183,13 +178,15 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-def get_gemini_api_key():
+def get_groq_api_key() -> str:
+    """Read GROQ_API_KEY from Streamlit secrets or env vars."""
     try:
-        if "GEMINI_API_KEY" in st.secrets:
-            return st.secrets["GEMINI_API_KEY"]
+        if "GROQ_API_KEY" in st.secrets:
+            return st.secrets["GROQ_API_KEY"]
     except Exception:
-        pass  
-    return os.environ.get("GEMINI_API_KEY", "")
+        pass
+    return os.environ.get("GROQ_API_KEY", "")
+
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
@@ -210,9 +207,16 @@ support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
-def build_gemini_prompt(category: str, responses: dict) -> str:
-    scored_items = sorted(responses.items(), key=lambda kv: kv[1]["score"], reverse=True)
+
+def build_debrief_prompt(category: str, responses: dict) -> str:
+    """Build the Groq prompt from category + top 3 concerns."""
+    scored_items = sorted(
+        responses.items(),
+        key=lambda kv: kv[1]["score"],
+        reverse=True,
+    )
     top_concerns = scored_items[:3]
+
     concerns_text = "\n".join(
         f"- {item['domain']}: \"{item['question']}\" — reported as \"{ANSWER_SCALE[item['score']]}\""
         for _, item in top_concerns
@@ -231,19 +235,42 @@ Write their confidential debrief now, addressed directly to them ("you").
     return prompt
 
 def get_ai_debrief(category: str, responses: dict) -> str:
-    api_key = get_gemini_api_key()
+    """
+    Try Groq first. If Groq key missing, request fails, or we hit a 429,
+    return the offline template instead.
+    """
+    api_key = get_groq_api_key()
+    if not api_key:
+        return _offline_debrief(category)
 
-    if GEMINI_SDK_AVAILABLE and api_key:
-        try:
-            client = genai.Client(api_key=api_key)
-            prompt = build_gemini_prompt(category, responses)
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception as e:
-            return _offline_debrief(category) + f"\n\n*(AI companion note: live response unavailable — {e})*"
+    prompt = build_debrief_prompt(category, responses)
+
+    try:
+        payload = {
+            "model": "llama-3.1-8b-instant",  # most generous free tier
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 500,
+        }
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=45,
+        )
+        resp.raise_for_status()
+        content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+        if content:
+            return content.strip()
+    except requests.exceptions.HTTPError as e:
+        # 429 = rate limited; fall back to offline
+        if e.response is not None and e.response.status_code == 429:
+            pass
+    except Exception:
+        pass
 
     return _offline_debrief(category)
 def _offline_debrief(category: str) -> str:
