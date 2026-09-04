@@ -464,21 +464,18 @@ with tab_assess:
             unsafe_allow_html=True,
         )
 
-        prev_ans = st.session_state.answers.get(q["id"])
-        
-                # (This line is 8 spaces in)
-        answer = st.radio(
+        answer = st.radio(        
             "How often...",
             options=list(range(4)),
-            # ... (other radio settings)
+            format_func=lambda i: ANSWER_SCALE[i],
+            index=None,
+            key=f"q_{q['id']}",
+            label_visibility="collapsed",
         )
 
-        # (This line MUST also be 8 spaces in, aligned with 'answer')
         n1, n2 = st.columns([1, 3])
 
-        # (This line MUST also be 8 spaces in, aligned with 'n1')
         if answer is None:
-            # (This line is 12 spaces in)
             n1.button(
                 "Finish" if current_q == total_q - 1 else "Next →",
                 type="secondary",
@@ -486,13 +483,11 @@ with tab_assess:
                 disabled=True,
             )
         else:
-            # (This line is 12 spaces in)
             if n1.button(
                 "Finish" if current_q == total_q - 1 else "Next →",
                 type="primary",
                 use_container_width=True,
             ):
-                # (This line is 16 spaces in)
                 st.session_state.answers[q["id"]] = answer
 
                 if current_q < total_q - 1:
@@ -501,7 +496,6 @@ with tab_assess:
                 else:
                     st.session_state.processing = True
                     st.rerun()
-
        # Processing Block
     if st.session_state.get("processing"):
         # 1. Calculate Score
