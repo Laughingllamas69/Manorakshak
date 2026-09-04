@@ -466,12 +466,14 @@ with tab_assess:
                 st.rerun()
 
     # Processing Block
+        # Processing Block
     if st.session_state.get("processing"):
-                total_score = sum(st.session_state.answers.values())
+        # 1. Calculate Score
+        total_score = sum(st.session_state.answers.values())
         category, emoji = score_to_category(total_score)
-        
-        with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
-                   ai_input = {
+
+        # 2. Rebuild format for AI
+        ai_input = {
             q["id"]: {
                 "question": q["text"],
                 "domain": q["domain"],
@@ -479,30 +481,33 @@ with tab_assess:
             }
             for q in QUESTIONS
         }
-        ai_text = get_ai_debrief(category, ai_input)
-        
+
+        # 3. Get AI Debrief
+        with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
+            ai_text = get_ai_debrief(category, ai_input)
+
+        # 4. Save to DB
         save_assessment(
             st.session_state.user_id,
             st.session_state.department,
             total_score,
             category,
-            st.session_state.answers,
-             ai_input,
+            ai_input,
+            ai_text,
         )
-        
+
+        # 5. Show Results
         st.divider()
         st.markdown(f"## {emoji} Result: **{category}**")
-        
         st.progress(min(total_score / MAX_SCORE, 1.0))
         st.caption(f"Score: {total_score} / {MAX_SCORE}")
-        
+
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
-        
         st.markdown(
             f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
             unsafe_allow_html=True
         )
-        
+
         if category == "Critical Distress":
             st.error(
                 "⚠️ Your responses suggest you may be going through a significant "
@@ -510,10 +515,10 @@ with tab_assess:
                 "helpline listed in the sidebar, or your unit's peer support contact. "
                 "You do not have to face this alone."
             )
-        
+
         st.success("This check-in has been saved. You can close this tab or go to your Dashboard.")
-        
-        # Reset state
+
+        # 6. Reset State
         st.session_state.answers = {}
         st.session_state.q_index = 0
         st.session_state.processing = False
