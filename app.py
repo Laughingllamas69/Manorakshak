@@ -439,19 +439,19 @@ with tab_assess:
 
         prev_ans = st.session_state.answers.get(q["id"])
         
+                # (This line is 8 spaces in)
         answer = st.radio(
-            "How often in the last 2 weeks?",
+            "How often...",
             options=list(range(4)),
-            format_func=lambda i: ANSWER_SCALE[i],
-            horizontal=True,
-            key=f"ans_{q['id']}",
-            index=prev_ans,
-            label_visibility="visible",
+            # ... (other radio settings)
         )
 
-               n1, n2 = st.columns([1, 3])
+        # (This line MUST also be 8 spaces in, aligned with 'answer')
+        n1, n2 = st.columns([1, 3])
 
+        # (This line MUST also be 8 spaces in, aligned with 'n1')
         if answer is None:
+            # (This line is 12 spaces in)
             n1.button(
                 "Finish" if current_q == total_q - 1 else "Next →",
                 type="secondary",
@@ -459,11 +459,13 @@ with tab_assess:
                 disabled=True,
             )
         else:
+            # (This line is 12 spaces in)
             if n1.button(
                 "Finish" if current_q == total_q - 1 else "Next →",
                 type="primary",
                 use_container_width=True,
             ):
+                # (This line is 16 spaces in)
                 st.session_state.answers[q["id"]] = answer
 
                 if current_q < total_q - 1:
