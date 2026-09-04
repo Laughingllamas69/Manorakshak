@@ -10,7 +10,6 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-def inject_css()
 import requests
 # Import the UI functions we just created
 from app_ui import inject_css, hero_header
@@ -315,7 +314,7 @@ st.set_page_config(
 )
 
 init_db()
-
+inject_css() # Call the CSS here
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
