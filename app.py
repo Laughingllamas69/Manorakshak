@@ -338,12 +338,29 @@ with st.sidebar:
         raw_id = st.text_input("Badge Number / Pseudonym", placeholder="e.g. Falcon-07")
         dept = st.selectbox("Department / Force", DEPARTMENTS)
 
-        if st.button("🔓 Enter Confidentially", use_container_width=True, type="primary"):
+    if st.button("🔓 Enter Confidentially", use_container_width=True, type="primary"):
             if raw_id.strip():
                 st.session_state.user_id = hash_pseudonym(raw_id)
                 st.session_state.department = dept
                 st.session_state.logged_in = True
                 st.rerun()
+    else:
+                st.warning("Please enter a badge number or pseudonym to continue.")
+    else:  # ✅ CORRECT: Aligned with 'if not st.session_state.logged_in:'
+        st.success(f"Signed in as **{st.session_state.user_id}**")
+        st.caption(f"Department: {st.session_state.department}")
+        
+        if st.button("🚪 End Session", use_container_width=True):
+            # Clear all custom session state variables
+            for key in list(st.session_state.keys()):
+                if key not in ["logged_in", "user_id", "department"]:
+                    del st.session_state[key]
+            
+            # Reset core login state
+            st.session_state.logged_in = False
+            st.session_state.user_id = ""
+            st.session_state.department = ""
+            st.rerun()
             else:
                 st.warning("Please enter a badge number or pseudonym to continue.")
       else:
