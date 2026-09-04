@@ -449,21 +449,29 @@ with tab_assess:
             label_visibility="visible",
         )
 
-        n1, n2 = st.columns([1, 3])
-        
-        if n1.button(
-            "Finish" if current_q == total_q - 1 else "Next →",
-            type="primary",
-            use_container_width=True,
-        ):
-            st.session_state.answers[q["id"]] = answer
-            
-            if current_q < total_q - 1:
-                st.session_state.q_index += 1
-                st.rerun()
-            else:
-                st.session_state.processing = True
-                st.rerun()
+               n1, n2 = st.columns([1, 3])
+
+        if answer is None:
+            n1.button(
+                "Finish" if current_q == total_q - 1 else "Next →",
+                type="secondary",
+                use_container_width=True,
+                disabled=True,
+            )
+        else:
+            if n1.button(
+                "Finish" if current_q == total_q - 1 else "Next →",
+                type="primary",
+                use_container_width=True,
+            ):
+                st.session_state.answers[q["id"]] = answer
+
+                if current_q < total_q - 1:
+                    st.session_state.q_index += 1
+                    st.rerun()
+                else:
+                    st.session_state.processing = True
+                    st.rerun()
 
        # Processing Block
     if st.session_state.get("processing"):
