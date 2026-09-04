@@ -1,0 +1,29 @@
+# .streamlit/config.toml
+[theme]
+base = "dark"
+primaryColor = "#E8A33D"          # muted saffron/amber
+backgroundColor = "#0E1420"        # deep navy-slate
+secondaryBackgroundColor = "#16202F"
+textColor = "#E6EAF0"
+linkColor = "#7FB2E5"
+borderColor = "#2A3purple"          # see note below
+borderRadius = "12px"
+font = "Inter"
+headingFont = "Inter"
+codeFont = "JetBrains Mono"
+
+[theme.light]
+base = "light"
+primaryColor = "#B4761B"
+backgroundColor = "#FBF9F6"
+secondaryBackgroundColor = "#F0EDE8"
+textColor = "#1B2430"
+
+[theme.sidebar]
+backgroundColor = "#0A0F18"
+secondaryBackgroundColor = "#16202F"
+
+[server]
+maxUploadSize = 10
+[browser]
+gatherUsageStats = false           # important: you handle sensitive data
