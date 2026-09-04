@@ -1,19 +1,20 @@
 # app_ui.py
 import streamlit as st
+import html  # For safely escaping user input
 
 def inject_css():
     """
-    Injects custom CSS for a calm, professional, and secure UI.
+    Injects custom CSS for a warm, calming, and secure UI.
     Call this immediately after st.set_page_config() in app.py.
     """
     st.markdown("""
     <style>
-        /* --- 1. GLOBAL CALM THEME --- */
-        /* Soft off-white background to reduce eye strain */
+        /* --- 1. WARM CALMING THEME --- */
+        /* Creamy off-white background to reduce eye strain and feel organic */
         .stApp {
-            background-color: #f8f9fa; 
-            color: #2d3748;
-            font-family: 'Segoe UI', 'Inter', sans-serif;
+            background-color: #FDFBF7; 
+            color: #4A4036; /* Warm charcoal, softer than black */
+            font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif;
         }
 
         /* Hide default Streamlit branding for a cleaner look */
@@ -28,173 +29,202 @@ def inject_css():
 
         /* --- 2. TYPOGRAPHY --- */
         h1, h2, h3 {
-            color: #2c5282; /* Deep, trustworthy blue */
+            color: #5D4037; /* Warm, earthy brown */
             font-weight: 600;
             letter-spacing: -0.5px;
+            margin-bottom: 0.5rem;
         }
 
         p, li {
-            line-height: 1.6;
-            color: #4a5568; /* Soft dark grey instead of black */
+            line-height: 1.7; /* Increased for readability */
+            color: #6D5E50; /* Soft warm grey-brown */
         }
 
-        /* --- 3. CARDS & CONTAINERS --- */
+        /* --- 3. CARDS & CONTAINERS (Warm & Soft) --- */
         /* Generic Card Style */
         .mr-card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
-            transition: transform 0.2s ease;
+            background-color: #FFFFFF;
+            border-radius: 16px; /* Softer corners */
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(93, 64, 55, 0.06); /* Warm shadow tint */
+            border: 1px solid #F0E6DC; /* Warm beige border */
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .mr-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(93, 64, 55, 0.1);
         }
 
         /* Question Card (Used in Survey) */
         .mr-qcard {
-            background-color: #ffffff;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-left: 5px solid #4299e1; /* Softer blue accent */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 18px;
+            border-left: 5px solid #D4A373; /* Warm Clay Accent */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
+
         .mr-domain {
-            color: #4299e1;
+            color: #D4A373; /* Warm Clay */
             font-weight: 700;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+
         .mr-qtext {
             font-size: 1.1rem;
-            color: #2d3748;
-            line-height: 1.5;
+            color: #4A4036;
+            line-height: 1.6;
         }
 
         /* Debrief Letter (AI Output) */
         .mr-letter {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            font-family: 'Georgia', serif; /* Serif for a personal letter feel */
-            font-size: 1.05rem;
-            line-height: 1.7;
-            color: #4a5568;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background-color: #FFFBF7; /* Very subtle warm tint */
+            border: 1px solid #E8DCC4;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            font-family: 'Georgia', 'Times New Roman', serif; /* Serif for empathy */
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #4A4036;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
         }
+
         .sig {
             text-align: right;
-            font-weight: bold;
-            margin-top: 15px;
-            color: #718096;
+            font-weight: 600;
+            margin-top: 20px;
+            color: #8D6E63; /* Muted warm brown */
             font-style: italic;
         }
 
-        /* --- 4. CRISIS & ALERTS --- */
-        /* Soft Crisis Banner (Not aggressive red, but visible) */
+        /* --- 4. CRISIS & ALERTS (Safe & Supportive) --- */
+        /* Soft Support Banner - Uses warm red/orange, not aggressive red */
         .mr-crisis {
-            background-color: #fff5f5;
-            border: 1px solid #feb2b2;
-            border-left: 5px solid #c53030;
-            padding: 16px 20px;
-            border-radius: 8px;
-            color: #742a2a;
-            margin-bottom: 20px;
+            background-color: #FFF8F5; /* Very light warm peach */
+            border: 1px solid #FECACA;
+            border-left: 5px solid #EA580C; /* Warm amber/orange */
+            padding: 20px 24px;
+            border-radius: 12px;
+            color: #7C2D12; /* Warm dark orange text */
+            margin-bottom: 24px;
         }
+
         .mr-crisis h4 {
             margin: 0 0 8px 0;
-            color: #c53030;
-            font-size: 1.1rem;
+            color: #EA580C;
+            font-size: 1.15rem;
+            font-weight: 600;
         }
+
         .mr-crisis p {
             margin: 0;
             font-size: 0.95rem;
+            color: #9A3412;
         }
 
-        /* --- 5. BUTTONS & INTERACTIONS --- */
-        /* Primary Action Button (Teal/Blue) */
+        /* --- 5. BUTTONS & INTERACTIONS (Warm & Inviting) --- */
+        /* Primary Action Button (Warm Terracotta) */
         .stButton > button, .stFormSubmitButton > button {
-            background-color: #3182ce;
-            color: white;
+            background-color: #D4A373; /* Warm Clay */
+            color: #FFFFFF;
             border: none;
-            border-radius: 8px;
-            padding: 10px 24px;
+            border-radius: 10px;
+            padding: 12px 28px;
             font-weight: 600;
-            transition: all 0.2s ease;
+            font-size: 1rem;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .stButton > button:hover, .stFormSubmitButton > button:hover {
-            background-color: #2b6cb0;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(49, 130, 206, 0.2);
+            background-color: #BC8A5F; /* Darker Clay */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(212, 163, 115, 0.3);
         }
 
         /* Secondary/Logout Button */
         .stButton > button[kind="secondary"] {
-            background-color: #edf2f7;
-            color: #4a5568;
-            border: 1px solid #cbd5e0;
+            background-color: #FDF5E6; /* Light cream */
+            color: #6D5E50;
+            border: 1px solid #E8DCC4;
+        }
+        
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #F0E6DC;
         }
 
         /* --- 6. TABS & NAVIGATION --- */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
+            gap: 12px;
             background-color: transparent;
         }
+
         .stTabs [data-baseweb="tab"] {
-            background-color: #e2e8f0;
-            border-radius: 6px 6px 0 0;
-            padding: 8px 16px;
+            background-color: #F5F0EB; /* Warm grey-beige */
+            border-radius: 8px 8px 0 0;
+            padding: 10px 20px;
             font-weight: 500;
-            color: #4a5568;
+            color: #6D5E50;
+            transition: all 0.2s ease;
         }
+
         .stTabs [aria-selected="true"] {
-            background-color: #3182ce;
-            color: white;
+            background-color: #D4A373; /* Warm Clay */
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         /* --- 7. SIDEBAR --- */
         section[data-testid="stSidebar"] {
-            background-color: #f1f5f9;
-            border-right: 1px solid #e2e8f0;
+            background-color: #F9F5F0; /* Warm off-white */
+            border-right: 1px solid #E8DCC4;
         }
+
         .sidebar .stMarkdown {
             font-size: 0.9rem;
-            color: #718096;
+            color: #8D6E63;
         }
     </style>
     """, unsafe_allow_html=True)
 
-
 def hero_header(title, subtitle, chips):
     """
     Renders the calm, centered hero section for the landing page.
+    Uses HTML escaping for security against XSS attacks.
     """
+    # SECURITY: Escape all user inputs to prevent HTML injection
+    safe_title = html.escape(title)
+    safe_subtitle = html.escape(subtitle)
+    
+    # Safely render chips
     chips_html = "".join([
-        f'<div style="background:#ffffff; padding: 6px 16px; border-radius: 20px; '
-        f'font-size: 0.85rem; color: #4a5568; border: 1px solid #e2e8f0; '
-        f'box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: inline-block; margin: 4px;">'
-        f'{chip}</div>' 
+        f'<div style="background:#ffffff; padding: 8px 20px; border-radius: 24px; '
+        f'font-size: 0.85rem; color: #6D5E50; border: 1px solid #E8DCC4; '
+        f'box-shadow: 0 2px 4px rgba(0,0,0,0.04); display: inline-block; margin: 6px;">'
+        f'{html.escape(chip)}</div>' 
         for chip in chips
     ])
-    
+
     st.markdown(f"""
-        <div style='text-align: center; margin-bottom: 3rem; padding: 2rem 1rem;'>
-            <h1 style='color: #2c5282; font-size: 2.8rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -1px;'>
-                {title}
+        <div style='text-align: center; margin-bottom: 3.5rem; padding: 3rem 1rem;'>
+            <h1 style='color: #5D4037; font-size: 3rem; font-weight: 700; margin-bottom: 0.8rem; letter-spacing: -1px;'>
+                {safe_title}
             </h1>
-            <p style='font-size: 1.2rem; color: #718096; max-width: 600px; margin: 0 auto 1.5rem auto; line-height: 1.6;'>
-                {subtitle}
+            <p style='font-size: 1.25rem; color: #8D6E63; max-width: 700px; margin: 0 auto 2rem auto; line-height: 1.6;'>
+                {safe_subtitle}
             </p>
-            <div style='margin-top: 2rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;'>
+            <div style='margin-top: 2.5rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;'>
                 {chips_html}
             </div>
         </div>
     """, unsafe_allow_html=True)
-
 
 def render_crisis_banner(helplines):
     """
@@ -204,31 +234,42 @@ def render_crisis_banner(helplines):
     """
     st.markdown("""
     <div class="mr-crisis">
-        <h4>🚨 Immediate Support Available</h4>
-        <p>You are not alone. If you or a colleague are in crisis, please reach out:</p>
+        <h4>🌸 You Are Not Alone</h4>
+        <p>If you or a colleague are in crisis, please reach out. Support is available 24/7.</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Render helplines in a clean grid
     if helplines:
+        # Ensure we don't break layout if list is empty or odd
         cols = st.columns(min(2, len(helplines)))
-        for i, h in enumerate(helplines):
+        
+        safe_helplines = [h for h in helplines if 'name' in h and 'number' in h]
+        
+        for i, h in enumerate(safe_helplines):
+            # SECURITY: Escape all input
+            h_name = html.escape(h['name'])
+            h_number = html.escape(h['number'])
+            
             with cols[i % 2]:
                 st.markdown(f"""
-                <div style="background: #fff; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #feb2b2;">
-                    <strong style="color:#c53030;">{h['name']}</strong><br>
-                    <span style="font-size:1.1rem; font-weight:600;">📞 {h['number']}</span>
+                <div style="background: #fff; padding: 16px; border-radius: 12px; margin-top: 10px; border: 1px solid #FECACA; text-align: center;">
+                    <strong style="color:#EA580C; font-size: 1.1rem;">{h_name}</strong><br>
+                    <span style="font-size:1.2rem; font-weight:600; color: #7C2D12;">📞 {h_number}</span>
                 </div>
                 """, unsafe_allow_html=True)
-
 
 def render_question_card(domain, question_text):
     """
     Helper to render a single survey question card.
     """
+    # SECURITY: Escape all HTML entities
+    safe_domain = html.escape(domain)
+    safe_question = html.escape(question_text)
+
     st.markdown(f"""
         <div class="mr-qcard">
-            <div class="mr-domain">{domain}</div>
-            <div class="mr-qtext">{question_text}</div>
+            <div class="mr-domain">{safe_domain}</div>
+            <div class="mr-qtext">{safe_question}</div>
         </div>
     """, unsafe_allow_html=True)
