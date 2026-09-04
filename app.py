@@ -1,21 +1,6 @@
 """
-===============================================================================
- ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Portal
- For Police Personnel & Armed Forces
-===============================================================================
-
-WHAT THIS FILE IS:
-A single-file Streamlit application. Frontend + backend + database logic
-all live here on purpose, so the whole prototype can be run with one
-command and deployed with zero build steps.
-
-FOR NON-PROGRAMMERS WHO WANT TO EDIT THIS APP:
-- All screener questions live in the QUESTIONS list (search "SECTION 2").
-- All on-screen text / labels live near the top in the TEXT dictionary
-  and in the SECTION headers below — edit the strings, not the logic.
-- Helpline numbers / resources live in the RESOURCES section.
-- To plug in your Gemini API key, see "SECTION 4: AI COMPANION" below.
-===============================================================================
+ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Portal
+For Police Personnel & Armed Forces
 """
 
 import os
@@ -23,11 +8,11 @@ import json
 import sqlite3
 import hashlib
 from datetime import datetime
-from app_ui import inject_css, hero_header
-
 import pandas as pd
 import streamlit as st
 
+# Import the UI functions we just created
+from app_ui import inject_css, hero_header
 
 try:
     import google.generativeai as genai
@@ -35,22 +20,16 @@ try:
 except ImportError:
     GEMINI_SDK_AVAILABLE = False
 
-
-
 DB_PATH = "manorakshak.db"
-
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
-
 
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
 
-
 DEFAULT_ADMIN_PASSWORD = "manorakshak_admin"
-
 
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
@@ -59,23 +38,14 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
-
-
-
 def get_connection():
-    """Open a fresh connection. SQLite connections are cheap, so we open
-    one per operation rather than keeping a long-lived global connection —
-    this avoids thread-safety issues inside Streamlit's execution model."""
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
 
-
 def init_db():
-    """Create the assessments table if it does not already exist."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS assessments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -86,14 +56,11 @@ def init_db():
             responses TEXT,
             ai_recommendation TEXT
         )
-        """
-    )
+    """)
     conn.commit()
     conn.close()
 
-
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
-    """Persist one completed assessment."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -114,9 +81,7 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
     conn.commit()
     conn.close()
 
-
 def get_user_history(user_id):
-    """Return all past assessments for one anonymous user, oldest first."""
     conn = get_connection()
     df = pd.read_sql_query(
         "SELECT * FROM assessments WHERE user_id = ? ORDER BY timestamp ASC",
@@ -126,24 +91,15 @@ def get_user_history(user_id):
     conn.close()
     return df
 
-
 def get_all_assessments():
-    """Return every assessment in the system — used only by the admin panel."""
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
     conn.close()
     return df
 
-
 def hash_pseudonym(raw_id: str) -> str:
-    """Turn whatever the officer types (badge number, nickname, etc.) into
-    a stable but non-reversible pseudonym for storage. This means even the
-    admin panel / raw database never stores the literal badge number."""
     raw_id = raw_id.strip().lower()
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
-
-
-
 
 ANSWER_SCALE = [
     "Not at all",
@@ -153,7 +109,6 @@ ANSWER_SCALE = [
 ]
 
 QUESTIONS = [
-  
     {
         "id": "q1",
         "text": "Little interest or pleasure in doing things you'd normally enjoy, on or off duty",
@@ -174,7 +129,6 @@ QUESTIONS = [
         "text": "Not being able to stop or control worrying",
         "domain": "Anxiety",
     },
-    # --- Duty-specific items ---
     {
         "id": "q5",
         "text": "Trouble falling or staying asleep due to shift timings or a racing mind",
@@ -207,9 +161,7 @@ QUESTIONS = [
     },
 ]
 
-MAX_SCORE = len(QUESTIONS) * 3  # 30
-
-
+MAX_SCORE = len(QUESTIONS) * 3
 SCORE_CATEGORIES = [
     (0, 7, "Low Stress", "🟢"),
     (8, 14, "Moderate Fatigue", "🟡"),
@@ -217,16 +169,11 @@ SCORE_CATEGORIES = [
     (22, MAX_SCORE, "Critical Distress", "🔴"),
 ]
 
-
 def score_to_category(total_score: int):
-    """Map a total numeric score to a (label, emoji) category tuple."""
     for low, high, label, emoji in SCORE_CATEGORIES:
         if low <= total_score <= high:
             return label, emoji
     return "Unknown", "⚪"
-
-
-
 
 SOP_RESETS = [
     "**Box Breathing (Tactical Reset):** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4–6 cycles before/after a high-stress call.",
@@ -236,18 +183,13 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-
-
-
 def get_gemini_api_key():
-    """Look for the API key in Streamlit secrets first, then env vars."""
     try:
         if "GEMINI_API_KEY" in st.secrets:
             return st.secrets["GEMINI_API_KEY"]
     except Exception:
         pass  
     return os.environ.get("GEMINI_API_KEY", "")
-
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
@@ -268,11 +210,7 @@ support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
-
 def build_gemini_prompt(category: str, responses: dict) -> str:
-    """Construct the prompt sent to Gemini, summarizing which duty-related
-    challenges scored highest so the response feels specifically tailored."""
-    
     scored_items = sorted(responses.items(), key=lambda kv: kv[1]["score"], reverse=True)
     top_concerns = scored_items[:3]
     concerns_text = "\n".join(
@@ -292,11 +230,7 @@ Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
-
 def get_ai_debrief(category: str, responses: dict) -> str:
-    """Call Gemini for a personalized debrief. Falls back to a static,
-    still-useful template if the SDK or API key is unavailable, so the
-    prototype always produces a complete end-to-end experience."""
     api_key = get_gemini_api_key()
 
     if GEMINI_SDK_AVAILABLE and api_key:
@@ -311,10 +245,7 @@ def get_ai_debrief(category: str, responses: dict) -> str:
 
     return _offline_debrief(category)
 
-
 def _offline_debrief(category: str) -> str:
-    """Template-based fallback response, used when no Gemini API key is
-    configured yet. Keeps the demo fully functional out of the box."""
     templates = {
         "Low Stress": (
             "Your readings look steady today — that's good, and it's worth "
@@ -347,16 +278,15 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
-
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed", 
+    initial_sidebar_state="collapsed",
+)
 
- 
 init_db()
- inject_css()
+inject_css() # Call the CSS here
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -364,8 +294,6 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = ""
 if "department" not in st.session_state:
     st.session_state.department = ""
-
-
 
 with st.sidebar:
     st.markdown("## 🛡️ ManoRakshak")
@@ -403,8 +331,6 @@ with st.sidebar:
     st.markdown("#### 🚨 In Crisis Right Now?")
     for h in HELPLINES:
         st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
-
-
 
 st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
@@ -465,84 +391,138 @@ if not st.session_state.logged_in:
     st.stop()
 
 tab_assess, tab_dashboard, tab_admin = st.tabs(
-    ["📝 Wellness Screener", "📊 My Dashboard & Resources", "🔐 Command Analytics (Admin)"]
+    [
+        "📝 Wellness Screener",
+        "📊 My Dashboard & Resources",
+        "🔐 Command Analytics (Admin)",
+    ]
 )
 
-
+# --- TAB 1: SCREENER (One Question at a Time) ---
 with tab_assess:
-    st.subheader("Confidential Duty Wellness Check-In")
-    st.caption(
-        "Over the **last 2 weeks**, how often have you been bothered by any of "
-        "the following? There are no right or wrong answers — answer honestly."
-    )
+    st.markdown("### Confidential Duty Wellness Check-In")
+    st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
 
-    with st.form("screener_form"):
-        responses = {}
-        for q in QUESTIONS:
-            answer_idx = st.radio(
-                f"**{q['text']}**",
-                options=list(range(4)),
-                format_func=lambda i: ANSWER_SCALE[i],
-                horizontal=True,
-                key=f"radio_{q['id']}",
-                index=None,
+    # Initialize state
+    if "answers" not in st.session_state:
+        st.session_state.answers = {}
+    if "q_index" not in st.session_state:
+        st.session_state.q_index = 0
+    
+    # If processing results, don't show questions
+    if not st.session_state.get("processing"):
+        current_q = st.session_state.q_index
+        total_q = len(QUESTIONS)
+        progress = current_q / total_q
+        
+        c1, c2 = st.columns([4, 1])
+        c1.progress(progress, text=f"Question {current_q + 1} of {total_q}")
+        
+        if current_q > 0:
+            c2.markdown("<br>", unsafe_allow_html=True)
+            if st.button("← Back", use_container_width=True):
+                st.session_state.q_index -= 1
+                st.rerun()
+
+        q = QUESTIONS[current_q]
+        
+        st.markdown(
+            f"""
+            <div class="mr-qcard">
+              <div class="mr-domain">{q['domain']}</div>
+              <div class="mr-qtext">{q['text']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        prev_ans = st.session_state.answers.get(q["id"])
+        
+        answer = st.radio(
+            "How often in the last 2 weeks?",
+            options=list(range(4)),
+            format_func=lambda i: ANSWER_SCALE[i],
+            horizontal=True,
+            key=f"ans_{q['id']}",
+            index=prev_ans,
+            label_visibility="visible",
+        )
+
+        n1, n2 = st.columns([1, 3])
+        
+        if n1.button(
+            "Finish" if current_q == total_q - 1 else "Next →",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state.answers[q["id"]] = answer
+            
+            if current_q < total_q - 1:
+                st.session_state.q_index += 1
+                st.rerun()
+            else:
+                st.session_state.processing = True
+                st.rerun()
+
+    # Processing Block
+    if st.session_state.get("processing"):
+        total_score = sum(item["score"] for item in st.session_state.answers.values())
+        category, emoji = score_to_category(total_score)
+        
+        with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
+            ai_text = get_ai_debrief(category, st.session_state.answers)
+        
+        save_assessment(
+            st.session_state.user_id,
+            st.session_state.department,
+            total_score,
+            category,
+            st.session_state.answers,
+            ai_text,
+        )
+        
+        st.divider()
+        st.markdown(f"## {emoji} Result: **{category}**")
+        
+        st.progress(min(total_score / MAX_SCORE, 1.0))
+        st.caption(f"Score: {total_score} / {MAX_SCORE}")
+        
+        st.markdown("### 🤝 A Message from Rakshak Sahayak")
+        
+        st.markdown(
+            f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
+            unsafe_allow_html=True
+        )
+        
+        if category == "Critical Distress":
+            st.error(
+                "⚠️ Your responses suggest you may be going through a significant "
+                "amount of distress. Please consider reaching out to a confidential "
+                "helpline listed in the sidebar, or your unit's peer support contact. "
+                "You do not have to face this alone."
             )
-            responses[q["id"]] = {
-                "question": q["text"],
-                "domain": q["domain"],
-                "score": answer_idx,
-            }
+        
+        st.success("This check-in has been saved. You can close this tab or go to your Dashboard.")
+        
+        # Reset state
+        st.session_state.answers = {}
+        st.session_state.q_index = 0
+        st.session_state.processing = False
+        st.rerun()
 
-        submitted = st.form_submit_button("✅ Submit Confidential Check-In", type="primary", use_container_width=True)
-
-    if submitted:
-   
-        unanswered = [q["text"] for q in QUESTIONS if responses[q["id"]]["score"] is None]
-        if unanswered:
-            st.error("Please answer every question before submitting. You've missed: " + "; ".join(unanswered))
-        else:
-            total_score = sum(item["score"] for item in responses.values())
-            category, emoji = score_to_category(total_score)
-
-            with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
-                ai_text = get_ai_debrief(category, responses)
-
-            save_assessment(
-                st.session_state.user_id,
-                st.session_state.department,
-                total_score,
-                category,
-                responses,
-                ai_text,
-            )
-
-            st.divider()
-            st.markdown(f"## {emoji} Result: **{category}**")
-            st.progress(min(total_score / MAX_SCORE, 1.0))
-            st.caption(f"Score: {total_score} / {MAX_SCORE}")
-
-            st.markdown("### 🤝 A Message from Rakshak Sahayak")
-            st.info(ai_text)
-
-            if category == "Critical Distress":
-                st.error(
-                    "⚠️ Your responses suggest you may be going through a significant "
-                    "amount of distress. Please consider reaching out to a confidential "
-                    "helpline listed in the sidebar, or your unit's peer support contact. "
-                    "You do not have to face this alone."
-                )
-
-            st.success("This check-in has been saved to your private wellness trend below (see 'My Dashboard' tab).")
-
-
-
+# --- TAB 2: DASHBOARD ---
 with tab_dashboard:
+    # Guard: Check if logged in
+    if not st.session_state.logged_in:
+        st.warning("Please log in to view your dashboard.")
+        st.stop()
+
     st.subheader("📈 Your Wellness Trend")
 
     history_df = get_user_history(st.session_state.user_id)
 
     if history_df.empty:
-        st.info("No check-ins yet. Complete a screener in the first tab to start your trend.")
+        st.info("No check-ins yet. [Complete a screener →](#tab_assess)")
     else:
         history_df["timestamp"] = pd.to_datetime(history_df["timestamp"])
         chart_df = history_df.set_index("timestamp")[["total_score"]].rename(
@@ -573,8 +553,7 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
-
-
+# --- TAB 3: ADMIN ---
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -585,7 +564,6 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-    
     try:
         expected_password = st.secrets.get("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
     except Exception:
@@ -614,7 +592,7 @@ with tab_admin:
             m1.metric("Total Screenings", total_screenings)
             m2.metric("Unique Anonymous Officers", unique_officers)
             m3.metric("% High Burnout / Critical", f"{high_risk_pct:.1f}%")
-            m4.metric("% Low Stress", f"{low_risk_pct:.1f}%")
+            m4.metric("% % Low Stress", f"{low_risk_pct:.1f}%")
 
             st.divider()
             col_a, col_b = st.columns(2)
