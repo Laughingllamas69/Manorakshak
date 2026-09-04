@@ -6,11 +6,13 @@ backgroundColor = "#0E1420"        # deep navy-slate
 secondaryBackgroundColor = "#16202F"
 textColor = "#E6EAF0"
 linkColor = "#7FB2E5"
-borderColor = "#2A3purple"          # see note below
+borderColor = "#2A3547"       # see note below
 borderRadius = "12px"
 font = "Inter"
 headingFont = "Inter"
 codeFont = "JetBrains Mono"
+font = "'Inter', 'Noto Sans Devanagari', sans-serif"
+headingFont = "'Inter', 'Noto Sans Devanagari', sans-serif"
 
 [theme.light]
 base = "light"
