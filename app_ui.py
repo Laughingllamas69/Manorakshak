@@ -1,6 +1,6 @@
-# app_ui.py
+
 import streamlit as st
-import html  # For safely escaping user input
+import html  
 
 def inject_css():
     """
@@ -199,11 +199,11 @@ def hero_header(title, subtitle, chips):
     Renders the calm, centered hero section for the landing page.
     Uses HTML escaping for security against XSS attacks.
     """
-    # SECURITY: Escape all user inputs to prevent HTML injection
+   
     safe_title = html.escape(title)
     safe_subtitle = html.escape(subtitle)
     
-    # Safely render chips
+   
     chips_html = "".join([
         f'<div style="background:#ffffff; padding: 8px 20px; border-radius: 24px; '
         f'font-size: 0.85rem; color: #6D5E50; border: 1px solid #E8DCC4; '
@@ -239,15 +239,15 @@ def render_crisis_banner(helplines):
     </div>
     """, unsafe_allow_html=True)
 
-    # Render helplines in a clean grid
+  
     if helplines:
-        # Ensure we don't break layout if list is empty or odd
+       
         cols = st.columns(min(2, len(helplines)))
         
         safe_helplines = [h for h in helplines if 'name' in h and 'number' in h]
         
         for i, h in enumerate(safe_helplines):
-            # SECURITY: Escape all input
+           
             h_name = html.escape(h['name'])
             h_number = html.escape(h['number'])
             
@@ -263,7 +263,7 @@ def render_question_card(domain, question_text):
     """
     Helper to render a single survey question card.
     """
-    # SECURITY: Escape all HTML entities
+   
     safe_domain = html.escape(domain)
     safe_question = html.escape(question_text)
 
