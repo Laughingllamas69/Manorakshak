@@ -3,10 +3,6 @@ ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Port
 
 For Police Personnel & Armed Forces
 
-
-Updated to use Google Gemini AI and expanded to 15 questions.
-
-Added typewriter effect for offline messages to simulate AI typing.
 """
 
 
@@ -14,7 +10,7 @@ import os
 import json
 import sqlite3
 import hashlib
-import time  # Added for typewriter effect
+import time  
 from datetime import datetime
 import pandas as pd
 import streamlit as st
