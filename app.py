@@ -1,6 +1,8 @@
 """
 ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Portal
 For Police Personnel & Armed Forces
+
+Updated to use Google Gemini AI and expanded to 15 questions.
 """
 
 import os
@@ -10,8 +12,7 @@ import hashlib
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-import requests
-
+import google.generativeai as genai
 
 try:
     from app_ui import inject_css, hero_header
@@ -23,13 +24,10 @@ DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
 
-
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
-
-DEFAULT_ADMIN_PASSWORD = "manorakshak_admin"
 
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
@@ -38,11 +36,9 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
-
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
-
 
 def init_db():
     conn = get_connection()
@@ -61,7 +57,6 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
     conn = get_connection()
@@ -84,7 +79,6 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
     conn.commit()
     conn.close()
 
-
 def get_user_history(user_id):
     conn = get_connection()
     df = pd.read_sql_query(
@@ -95,18 +89,15 @@ def get_user_history(user_id):
     conn.close()
     return df
 
-
 def get_all_assessments():
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
     conn.close()
     return df
 
-
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
-
 
 ANSWER_SCALE = [
     "Not at all",
@@ -114,6 +105,7 @@ ANSWER_SCALE = [
     "More than half the days",
     "Nearly every day",
 ]
+
 
 QUESTIONS = [
     {
@@ -166,16 +158,43 @@ QUESTIONS = [
         "text": "Physical exhaustion affecting your alertness, focus, or performance on duty",
         "domain": "Burnout",
     },
+    
+    {
+        "id": "q11",
+        "text": "Relying on alcohol, tobacco, or other substances to cope with stress or sleep",
+        "domain": "Substance Use",
+    },
+    {
+        "id": "q12",
+        "text": "Difficulty concentrating or making decisions, even on simple tasks",
+        "domain": "Cognitive Function",
+    },
+    {
+        "id": "q13",
+        "text": "Feeling guilty about past actions or inactions during an incident",
+        "domain": "Guilt / Moral Injury",
+    },
+    {
+        "id": "q14",
+        "text": "Difficulty trusting colleagues or feeling unsupported by your team",
+        "domain": "Team Dynamics",
+    },
+    {
+        "id": "q15",
+        "text": "Physical symptoms like headaches, stomach issues, or muscle tension without a clear medical cause",
+        "domain": "Psychosomatic",
+    },
 ]
 
 MAX_SCORE = len(QUESTIONS) * 3
+# Adjusted thresholds for 15 questions (Max 45)
+# 0-10: Low, 11-21: Moderate, 22-33: High, 34+: Critical
 SCORE_CATEGORIES = [
-    (0, 7, "Low Stress", "🟢"),
-    (8, 14, "Moderate Fatigue", "🟡"),
-    (15, 21, "High Burnout", "🟠"),
-    (22, MAX_SCORE, "Critical Distress", "🔴"),
+    (0, 10, "Low Stress", "🟢"),
+    (11, 21, "Moderate Fatigue", "🟡"),
+    (22, 33, "High Burnout", "🟠"),
+    (34, MAX_SCORE, "Critical Distress", "🔴"),
 ]
-
 
 def score_to_category(total_score: int):
     for low, high, label, emoji in SCORE_CATEGORIES:
@@ -191,34 +210,56 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-
-def get_ollama_response(system_prompt: str, user_prompt: str) -> str | None:
-    """Call local Ollama chat endpoint. Returns text or None on failure."""
-    url = "http://localhost:11434/api/chat"
-    payload = {
-        "model": "llama3.2",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "stream": False,
-        "options": {"temperature": 0.7, "num_predict": 500},
-    }
-    
+def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
+    """Call Google Gemini API. Returns text or None on failure."""
     try:
-        response = requests.post(url, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        return result["message"]["content"].strip()
-    except Exception as e:
-        print(f"Ollama Error: {e}")
-        return None
+        # Initialize the client
+        api_key = None
+        
+        # Try to get from secrets first
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY")
+        except:
+            pass
+            
+        # Fallback to environment variable
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
 
+        if not api_key:
+            print("Error: GEMINI_API_KEY not found in secrets or environment variables.")
+            return None
+
+        genai.configure(api_key=api_key)
+
+        
+        model = genai.GenerativeModel('gemini-3.6-flash')
+
+        # Construct the full prompt
+        full_prompt = f"{system_prompt}\n\nUser Request: {user_prompt}"
+
+        # Generate response
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=500
+            )
+        )
+
+        if response and response.text:
+            return response.text.strip()
+        else:
+            print("Gemini returned empty response.")
+            return None
+
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        return None
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
 companion built specifically for Indian police and armed forces personnel.
-
 
 Your tone: respectful, calm, non-clinical, never condescending. You address
 the officer as a professional who serves under real operational stress —
@@ -229,22 +270,18 @@ post-shift decompression routines). Keep the response under 220 words,
 in plain conversational English (a few Hindi words like "himmat" or
 "seva" are welcome if natural, but do not overdo it).
 
-
 If the distress category is "Critical Distress", gently and non-alarmingly
 encourage them to reach out to a confidential helpline or their peer
 support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
-
 def build_debrief_prompt(category: str, responses: dict) -> str:
     """Build the prompt from category + top 3 concerns."""
-   
     scored_items = []
     for q in QUESTIONS:
         q_id = q["id"]
         if q_id in responses:
-            
             score_val = responses[q_id]
             if isinstance(score_val, dict):
                 score_val = score_val.get("score", 0)
@@ -255,7 +292,6 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
                 "score": score_val
             })
     
-   
     scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
 
@@ -269,35 +305,28 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
 
     prompt = f"""{RAKSHAK_SAHAYAK_PERSONA}
 
-
 An officer has just completed a confidential wellness screener.
 Overall result category: {category}
 
-
 Their top reported challenge areas:
 {concerns_text}
-
 
 Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
-
 def get_ai_debrief(category: str, responses: dict) -> str:
     """
-    Calls the local Ollama server. If it fails, returns the offline template.
+    Calls the Google Gemini server. If it fails, returns the offline template.
     """
     prompt = build_debrief_prompt(category, responses)
     
-    
-    ai_response = get_ollama_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
+    ai_response = get_gemini_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
     
     if ai_response and len(ai_response) > 10:
         return ai_response
-        
     
     return _offline_debrief(category)
-
 
 def _offline_debrief(category: str) -> str:
     templates = {
@@ -331,7 +360,6 @@ def _offline_debrief(category: str) -> str:
         ),
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
-
 
 st.set_page_config(
     page_title="ManoRakshak",
@@ -382,12 +410,11 @@ with st.sidebar:
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
                     del st.session_state[key]
-            
-           
-            st.session_state.logged_in = False
-            st.session_state.user_id = ""
-            st.session_state.department = ""
-            st.rerun()
+                
+                st.session_state.logged_in = False
+                st.session_state.user_id = ""
+                st.session_state.department = ""
+                st.rerun()
 
     st.divider()
     st.markdown("#### 🚨 In Crisis Right Now?")
@@ -460,7 +487,6 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
     ]
 )
 
-
 with tab_assess:
     st.markdown("### Confidential Duty Wellness Check-In")
     st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
@@ -471,7 +497,7 @@ with tab_assess:
     if "q_index" not in st.session_state:
         st.session_state.q_index = 0
     
-    
+
     if not st.session_state.get("processing"):
         current_q = st.session_state.q_index
         total_q = len(QUESTIONS)
@@ -498,7 +524,7 @@ with tab_assess:
             unsafe_allow_html=True,
         )
 
-        answer = st.radio(        
+        answer = st.radio(         
             "How often...",
             options=list(range(4)),
             format_func=lambda i: ANSWER_SCALE[i],
@@ -561,10 +587,10 @@ with tab_assess:
             ai_text,
         )
 
-       
+        
         st.session_state.processing = False
 
-       
+        
         st.divider()
         st.markdown(f"## {emoji} Your Result: **{category}**")
         st.progress(min(total_score / MAX_SCORE, 1.0))
@@ -596,7 +622,6 @@ with tab_assess:
             st.session_state.answers = {}
             st.session_state.q_index = 0
             st.rerun()
-
 
 with tab_dashboard:
     
@@ -640,7 +665,6 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
-
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -651,10 +675,11 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-   
+    
     if "ADMIN_PASSWORD" not in st.secrets:
         st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
         st.stop()
+    
     
     try:
         expected_password = st.secrets.get("ADMIN_PASSWORD")
