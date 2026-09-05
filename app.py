@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 import requests
 
-# Ensure app_ui.py exists and contains inject_css and hero_header
+
 try:
     from app_ui import inject_css, hero_header
 except ImportError:
@@ -239,12 +239,12 @@ readiness, not weakness. Do not be preachy about this — one sentence is enough
 
 def build_debrief_prompt(category: str, responses: dict) -> str:
     """Build the prompt from category + top 3 concerns."""
-    # Convert responses dict to list for sorting
+   
     scored_items = []
     for q in QUESTIONS:
         q_id = q["id"]
         if q_id in responses:
-            # Ensure we are grabbing the integer score, not the whole dict
+            
             score_val = responses[q_id]
             if isinstance(score_val, dict):
                 score_val = score_val.get("score", 0)
@@ -255,7 +255,7 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
                 "score": score_val
             })
     
-    # Sort by score descending - now safe because 'score' is an integer
+   
     scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
 
@@ -289,13 +289,13 @@ def get_ai_debrief(category: str, responses: dict) -> str:
     """
     prompt = build_debrief_prompt(category, responses)
     
-    # Call Ollama
+    
     ai_response = get_ollama_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
     
     if ai_response and len(ai_response) > 10:
         return ai_response
         
-    # Fallback to offline template if Ollama is down or slow
+    
     return _offline_debrief(category)
 
 
@@ -378,12 +378,12 @@ with st.sidebar:
         st.caption(f"Department: {st.session_state.department}")
         
         if st.button("🚪 End Session", use_container_width=True):
-            # Clear all custom session state variables
+            
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
                     del st.session_state[key]
             
-            # Reset core login state
+           
             st.session_state.logged_in = False
             st.session_state.user_id = ""
             st.session_state.department = ""
@@ -460,18 +460,18 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
     ]
 )
 
-# --- TAB 1: SCREENER (One Question at a Time) ---
+
 with tab_assess:
     st.markdown("### Confidential Duty Wellness Check-In")
     st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
 
-    # Initialize state
+    
     if "answers" not in st.session_state:
         st.session_state.answers = {}
     if "q_index" not in st.session_state:
         st.session_state.q_index = 0
     
-    # If processing results, don't show questions
+    
     if not st.session_state.get("processing"):
         current_q = st.session_state.q_index
         total_q = len(QUESTIONS)
@@ -531,13 +531,13 @@ with tab_assess:
                     st.session_state.processing = True
                     st.rerun()
 
-    # Processing Block
+    
     if st.session_state.get("processing"):
-        # 1. Calculate Score
+        
         total_score = sum(v for v in st.session_state.answers.values() if v is not None)
         category, emoji = score_to_category(total_score)
 
-        # 2. Rebuild format for AI
+       
         ai_input = {
             q["id"]: {
                 "question": q["text"],
@@ -547,11 +547,11 @@ with tab_assess:
             for q in QUESTIONS
         }
 
-        # 3. Get AI Debrief
+        
         with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
             ai_text = get_ai_debrief(category, ai_input)
 
-        # 4. Save to DB (only once)
+        
         save_assessment(
             st.session_state.user_id,
             st.session_state.department,
@@ -561,10 +561,10 @@ with tab_assess:
             ai_text,
         )
 
-        # 5. Stop the loop BEFORE rendering
+       
         st.session_state.processing = False
 
-        # 6. Show Results
+       
         st.divider()
         st.markdown(f"## {emoji} Your Result: **{category}**")
         st.progress(min(total_score / MAX_SCORE, 1.0))
@@ -586,7 +586,7 @@ with tab_assess:
 
         st.success("This check-in has been saved to your private wellness trend.")
 
-        # 7. Buttons instead of auto-rerun
+        
         b1, b2 = st.columns(2)
         if b1.button("🔄 Take check-in again", use_container_width=True):
             st.session_state.answers = {}
@@ -597,9 +597,9 @@ with tab_assess:
             st.session_state.q_index = 0
             st.rerun()
 
-# --- TAB 2: DASHBOARD ---
+
 with tab_dashboard:
-    # Guard: Check if logged in
+    
     if not st.session_state.logged_in:
         st.warning("Please log in to view your dashboard.")
         st.stop()
@@ -640,7 +640,7 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
-# --- TAB 3: ADMIN ---
+
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -651,7 +651,7 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-    # Check if admin password is configured in secrets
+   
     if "ADMIN_PASSWORD" not in st.secrets:
         st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
         st.stop()
