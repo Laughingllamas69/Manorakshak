@@ -3,6 +3,11 @@ ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Port
 
 For Police Personnel & Armed Forces
 
+
+Updated to use Google Gemini AI and expanded to 15 questions.
+
+Removed the "Offline Mode" warning message. The app now seamlessly displays 
+the AI response or the offline template without interrupting the user experience.
 """
 
 
@@ -10,7 +15,7 @@ import os
 import json
 import sqlite3
 import hashlib
-import time  
+import time  # Kept in case you want to use typewriter for future features
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -388,7 +393,7 @@ def _offline_debrief(category: str) -> str:
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
 
-# --- Typewriter Effect Helper ---
+# --- Typewriter Effect Helper (Kept for potential future use, but not active now) ---
 def typewriter_text(text: str, delay: float = 0.02):
     """
     Generator that yields words of the text with a delay.
@@ -620,22 +625,9 @@ with tab_assess:
             for q in QUESTIONS
         }
 
-        # Determine if we are using AI or Offline
-        # We re-call get_ai_debrief to get the text, but we also need to know if it was offline
-        # Since get_ai_debrief returns the text regardless, we check the length or status
-        # To be cleaner, let's modify get_ai_debrief to return a tuple or check if it matches the offline template
-        # For this implementation, we will check if the response is the default offline template (simple check)
-        # Or better: we can check if get_gemini_response returned None
-        
-        is_offline = False
+        # Get the AI response (or offline fallback)
+        # We no longer check if it's offline to show a warning; we just display the result
         ai_text = get_ai_debrief(category, ai_input)
-        
-        # Check if it fell back to offline (simple heuristic: if it matches the specific template for the category exactly)
-        # A more robust way is to change get_ai_debrief to return (text, is_offline), but to keep changes minimal:
-        # We'll re-check the status inside the display logic by comparing against the known templates
-        offline_template = _offline_debrief(category)
-        if ai_text == offline_template:
-            is_offline = True
 
         save_assessment(
             st.session_state.user_id,
@@ -655,20 +647,12 @@ with tab_assess:
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
         
-        if is_offline:
-            # Offline Mode: Show warning and use typewriter effect
-            st.warning("⚠️ Rakshak Sahayak is currently offline. Showing locally generated guidance.")
-            st.caption("Your assessment has been saved. Here is your personalized support message:")
-            
-            # Use container to hold the typewriter stream
-            with st.container():
-                st.write_stream(typewriter_text(ai_text), cursor="▋")
-        else:
-            # Online Mode: Normal display
-            st.markdown(
-                f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
-                unsafe_allow_html=True,
-            )
+        # Display the result directly, whether it's from AI or offline template.
+        # No warning is shown anymore.
+        st.markdown(
+            f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
+            unsafe_allow_html=True,
+        )
 
         if category == "Critical Distress":
             st.error(
