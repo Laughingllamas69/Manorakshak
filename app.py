@@ -11,13 +11,18 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 import requests
-# Import the UI functions we just created
-from app_ui import inject_css, hero_header
 
+# Ensure app_ui.py exists and contains inject_css and hero_header
+try:
+    from app_ui import inject_css, hero_header
+except ImportError:
+    st.error("Error: 'app_ui.py' module not found. Please ensure it exists in the same directory.")
+    st.stop()
 
 DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
+
 
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
@@ -33,9 +38,11 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
+
 
 def init_db():
     conn = get_connection()
@@ -54,6 +61,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
     conn = get_connection()
@@ -76,6 +84,7 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
     conn.commit()
     conn.close()
 
+
 def get_user_history(user_id):
     conn = get_connection()
     df = pd.read_sql_query(
@@ -86,15 +95,18 @@ def get_user_history(user_id):
     conn.close()
     return df
 
+
 def get_all_assessments():
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
     conn.close()
     return df
 
+
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
+
 
 ANSWER_SCALE = [
     "Not at all",
@@ -164,6 +176,7 @@ SCORE_CATEGORIES = [
     (22, MAX_SCORE, "Critical Distress", "🔴"),
 ]
 
+
 def score_to_category(total_score: int):
     for low, high, label, emoji in SCORE_CATEGORIES:
         if low <= total_score <= high:
@@ -178,19 +191,34 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-def get_groq_api_key() -> str:
-    """Read GROQ_API_KEY from Streamlit secrets or env vars."""
+
+def get_ollama_response(system_prompt: str, user_prompt: str) -> str | None:
+    """Call local Ollama chat endpoint. Returns text or None on failure."""
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": "llama3.2",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "stream": False,
+        "options": {"temperature": 0.7, "num_predict": 500},
+    }
+    
     try:
-        if "GROQ_API_KEY" in st.secrets:
-            return st.secrets["GROQ_API_KEY"]
-    except Exception:
-        pass
-    return os.environ.get("GROQ_API_KEY", "")
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        result = response.json()
+        return result["message"]["content"].strip()
+    except Exception as e:
+        print(f"Ollama Error: {e}")
+        return None
 
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
 companion built specifically for Indian police and armed forces personnel.
+
 
 Your tone: respectful, calm, non-clinical, never condescending. You address
 the officer as a professional who serves under real operational stress —
@@ -201,6 +229,7 @@ post-shift decompression routines). Keep the response under 220 words,
 in plain conversational English (a few Hindi words like "himmat" or
 "seva" are welcome if natural, but do not overdo it).
 
+
 If the distress category is "Critical Distress", gently and non-alarmingly
 encourage them to reach out to a confidential helpline or their peer
 support contact, and mention that reaching out is a sign of operational
@@ -209,70 +238,67 @@ readiness, not weakness. Do not be preachy about this — one sentence is enough
 
 
 def build_debrief_prompt(category: str, responses: dict) -> str:
-    """Build the Groq prompt from category + top 3 concerns."""
-    scored_items = sorted(
-        responses.items(),
-        key=lambda kv: kv[1]["score"],
-        reverse=True,
-    )
+    """Build the prompt from category + top 3 concerns."""
+    # Convert responses dict to list for sorting
+    scored_items = []
+    for q in QUESTIONS:
+        q_id = q["id"]
+        if q_id in responses:
+            # Ensure we are grabbing the integer score, not the whole dict
+            score_val = responses[q_id]
+            if isinstance(score_val, dict):
+                score_val = score_val.get("score", 0)
+            
+            scored_items.append({
+                "question": q["text"],
+                "domain": q["domain"],
+                "score": score_val
+            })
+    
+    # Sort by score descending - now safe because 'score' is an integer
+    scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
 
-    concerns_text = "\n".join(
-        f"- {item['domain']}: \"{item['question']}\" — reported as \"{ANSWER_SCALE[item['score']]}\""
-        for _, item in top_concerns
-    )
+    concerns_list = []
+    for item in top_concerns:
+        score_val = item['score']
+        label = ANSWER_SCALE[score_val] if score_val < len(ANSWER_SCALE) else "Unknown"
+        concerns_list.append(f"- {item['domain']}: \"{item['question']}\" — reported as \"{label}\"")
+    
+    concerns_text = "\n".join(concerns_list)
 
     prompt = f"""{RAKSHAK_SAHAYAK_PERSONA}
+
 
 An officer has just completed a confidential wellness screener.
 Overall result category: {category}
 
+
 Their top reported challenge areas:
 {concerns_text}
+
 
 Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
+
 def get_ai_debrief(category: str, responses: dict) -> str:
     """
-    Try Groq first. If Groq key missing, request fails, or we hit a 429,
-    return the offline template instead.
+    Calls the local Ollama server. If it fails, returns the offline template.
     """
-    api_key = get_groq_api_key()
-    if not api_key:
-        return _offline_debrief(category)
-
     prompt = build_debrief_prompt(category, responses)
-
-    try:
-        payload = {
-            "model": "llama-3.1-8b-instant",  # most generous free tier
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-            "max_tokens": 500,
-        }
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-        if content:
-            return content.strip()
-    except requests.exceptions.HTTPError as e:
-        # 429 = rate limited; fall back to offline
-        if e.response is not None and e.response.status_code == 429:
-            pass
-    except Exception:
-        pass
-
+    
+    # Call Ollama
+    ai_response = get_ollama_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
+    
+    if ai_response and len(ai_response) > 10:
+        return ai_response
+        
+    # Fallback to offline template if Ollama is down or slow
     return _offline_debrief(category)
+
+
 def _offline_debrief(category: str) -> str:
     templates = {
         "Low Stress": (
@@ -306,6 +332,7 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
+
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
@@ -314,7 +341,7 @@ st.set_page_config(
 )
 
 init_db()
-inject_css() # Call the CSS here
+inject_css()
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -503,7 +530,8 @@ with tab_assess:
                 else:
                     st.session_state.processing = True
                     st.rerun()
-       # Processing Block
+
+    # Processing Block
     if st.session_state.get("processing"):
         # 1. Calculate Score
         total_score = sum(v for v in st.session_state.answers.values() if v is not None)
@@ -568,6 +596,7 @@ with tab_assess:
             st.session_state.answers = {}
             st.session_state.q_index = 0
             st.rerun()
+
 # --- TAB 2: DASHBOARD ---
 with tab_dashboard:
     # Guard: Check if logged in
@@ -622,10 +651,10 @@ with tab_admin:
 
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-      # Check if admin password is configured in secrets
+    # Check if admin password is configured in secrets
     if "ADMIN_PASSWORD" not in st.secrets:
         st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
-        st.stop() # Stop execution immediately
+        st.stop()
     
     try:
         expected_password = st.secrets.get("ADMIN_PASSWORD")
@@ -656,7 +685,7 @@ with tab_admin:
             m1.metric("Total Screenings", total_screenings)
             m2.metric("Unique Anonymous Officers", unique_officers)
             m3.metric("% High Burnout / Critical", f"{high_risk_pct:.1f}%")
-            m4.metric("% % Low Stress", f"{low_risk_pct:.1f}%")
+            m4.metric("% Low Stress", f"{low_risk_pct:.1f}%")
 
             st.divider()
             col_a, col_b = st.columns(2)
