@@ -1,18 +1,25 @@
 """
 ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Portal
+
 For Police Personnel & Armed Forces
 
+
 Updated to use Google Gemini AI and expanded to 15 questions.
+
+Added typewriter effect for offline messages to simulate AI typing.
 """
+
 
 import os
 import json
 import sqlite3
 import hashlib
+import time  # Added for typewriter effect
 from datetime import datetime
 import pandas as pd
 import streamlit as st
 import google.generativeai as genai
+
 
 try:
     from app_ui import inject_css, hero_header
@@ -20,14 +27,17 @@ except ImportError:
     st.error("Error: 'app_ui.py' module not found. Please ensure it exists in the same directory.")
     st.stop()
 
+
 DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
+
 
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
+
 
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
@@ -36,9 +46,11 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
+
 
 def init_db():
     conn = get_connection()
@@ -57,6 +69,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
     conn = get_connection()
@@ -79,6 +92,7 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
     conn.commit()
     conn.close()
 
+
 def get_user_history(user_id):
     conn = get_connection()
     df = pd.read_sql_query(
@@ -89,15 +103,18 @@ def get_user_history(user_id):
     conn.close()
     return df
 
+
 def get_all_assessments():
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
     conn.close()
     return df
 
+
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
+
 
 ANSWER_SCALE = [
     "Not at all",
@@ -105,6 +122,8 @@ ANSWER_SCALE = [
     "More than half the days",
     "Nearly every day",
 ]
+
+
 
 
 QUESTIONS = [
@@ -159,6 +178,7 @@ QUESTIONS = [
         "domain": "Burnout",
     },
     
+
     {
         "id": "q11",
         "text": "Relying on alcohol, tobacco, or other substances to cope with stress or sleep",
@@ -186,6 +206,7 @@ QUESTIONS = [
     },
 ]
 
+
 MAX_SCORE = len(QUESTIONS) * 3
 # Adjusted thresholds for 15 questions (Max 45)
 # 0-10: Low, 11-21: Moderate, 22-33: High, 34+: Critical
@@ -196,11 +217,13 @@ SCORE_CATEGORIES = [
     (34, MAX_SCORE, "Critical Distress", "🔴"),
 ]
 
+
 def score_to_category(total_score: int):
     for low, high, label, emoji in SCORE_CATEGORIES:
         if low <= total_score <= high:
             return label, emoji
     return "Unknown", "⚪"
+
 
 SOP_RESETS = [
     "**Box Breathing (Tactical Reset):** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4–6 cycles before/after a high-stress call.",
@@ -209,6 +232,7 @@ SOP_RESETS = [
     "**Sleep Hygiene for Rotating Shifts:** Blackout curtains, no screens 30 min before sleep, consistent wind-down ritual regardless of shift time.",
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
+
 
 def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
     """Call Google Gemini API. Returns text or None on failure."""
@@ -221,7 +245,7 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
             api_key = st.secrets.get("GEMINI_API_KEY")
         except:
             pass
-            
+        
         # Fallback to environment variable
         if not api_key:
             api_key = os.getenv("GEMINI_API_KEY")
@@ -257,6 +281,7 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
         print(f"Gemini Error: {e}")
         return None
 
+
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
 companion built specifically for Indian police and armed forces personnel.
@@ -276,6 +301,7 @@ support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
+
 def build_debrief_prompt(category: str, responses: dict) -> str:
     """Build the prompt from category + top 3 concerns."""
     scored_items = []
@@ -285,12 +311,13 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
             score_val = responses[q_id]
             if isinstance(score_val, dict):
                 score_val = score_val.get("score", 0)
-            
+
             scored_items.append({
                 "question": q["text"],
                 "domain": q["domain"],
                 "score": score_val
             })
+
     
     scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
@@ -300,6 +327,7 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
         score_val = item['score']
         label = ANSWER_SCALE[score_val] if score_val < len(ANSWER_SCALE) else "Unknown"
         concerns_list.append(f"- {item['domain']}: \"{item['question']}\" — reported as \"{label}\"")
+
     
     concerns_text = "\n".join(concerns_list)
 
@@ -315,6 +343,7 @@ Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
+
 def get_ai_debrief(category: str, responses: dict) -> str:
     """
     Calls the Google Gemini server. If it fails, returns the offline template.
@@ -327,6 +356,7 @@ def get_ai_debrief(category: str, responses: dict) -> str:
         return ai_response
     
     return _offline_debrief(category)
+
 
 def _offline_debrief(category: str) -> str:
     templates = {
@@ -361,6 +391,18 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
+
+# --- Typewriter Effect Helper ---
+def typewriter_text(text: str, delay: float = 0.02):
+    """
+    Generator that yields words of the text with a delay.
+    Used with st.write_stream for a typewriter effect.
+    """
+    for word in text.split():
+        yield word + " "
+        time.sleep(delay)
+
+
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
@@ -368,8 +410,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
 init_db()
 inject_css()
+
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -377,6 +421,7 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = ""
 if "department" not in st.session_state:
     st.session_state.department = ""
+
 
 with st.sidebar:
     st.markdown("## 🛡️ ManoRakshak")
@@ -404,13 +449,13 @@ with st.sidebar:
     else:
         st.success(f"Signed in as **{st.session_state.user_id}**")
         st.caption(f"Department: {st.session_state.department}")
-        
+
         if st.button("🚪 End Session", use_container_width=True):
-            
+
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
                     del st.session_state[key]
-                
+
                 st.session_state.logged_in = False
                 st.session_state.user_id = ""
                 st.session_state.department = ""
@@ -421,8 +466,10 @@ with st.sidebar:
     for h in HELPLINES:
         st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
 
+
 st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
+
 
 if not st.session_state.logged_in:
     hero_header(
@@ -479,6 +526,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 
+
 tab_assess, tab_dashboard, tab_admin = st.tabs(
     [
         "📝 Wellness Screener",
@@ -487,9 +535,11 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
     ]
 )
 
+
 with tab_assess:
     st.markdown("### Confidential Duty Wellness Check-In")
     st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
+
 
     
     if "answers" not in st.session_state:
@@ -502,10 +552,10 @@ with tab_assess:
         current_q = st.session_state.q_index
         total_q = len(QUESTIONS)
         progress = current_q / total_q
-        
+
         c1, c2 = st.columns([4, 1])
         c1.progress(progress, text=f"Question {current_q + 1} of {total_q}")
-        
+
         if current_q > 0:
             c2.markdown("<br>", unsafe_allow_html=True)
             if st.button("← Back", use_container_width=True):
@@ -513,7 +563,7 @@ with tab_assess:
                 st.rerun()
 
         q = QUESTIONS[current_q]
-        
+
         st.markdown(
             f"""
             <div class="mr-qcard">
@@ -560,6 +610,7 @@ with tab_assess:
     
     if st.session_state.get("processing"):
         
+
         total_score = sum(v for v in st.session_state.answers.values() if v is not None)
         category, emoji = score_to_category(total_score)
 
@@ -573,11 +624,23 @@ with tab_assess:
             for q in QUESTIONS
         }
 
+        # Determine if we are using AI or Offline
+        # We re-call get_ai_debrief to get the text, but we also need to know if it was offline
+        # Since get_ai_debrief returns the text regardless, we check the length or status
+        # To be cleaner, let's modify get_ai_debrief to return a tuple or check if it matches the offline template
+        # For this implementation, we will check if the response is the default offline template (simple check)
+        # Or better: we can check if get_gemini_response returned None
         
-        with st.spinner("Rakshak Sahayak is preparing your confidential debrief..."):
-            ai_text = get_ai_debrief(category, ai_input)
+        is_offline = False
+        ai_text = get_ai_debrief(category, ai_input)
+        
+        # Check if it fell back to offline (simple heuristic: if it matches the specific template for the category exactly)
+        # A more robust way is to change get_ai_debrief to return (text, is_offline), but to keep changes minimal:
+        # We'll re-check the status inside the display logic by comparing against the known templates
+        offline_template = _offline_debrief(category)
+        if ai_text == offline_template:
+            is_offline = True
 
-        
         save_assessment(
             st.session_state.user_id,
             st.session_state.department,
@@ -587,20 +650,29 @@ with tab_assess:
             ai_text,
         )
 
-        
         st.session_state.processing = False
 
-        
         st.divider()
         st.markdown(f"## {emoji} Your Result: **{category}**")
         st.progress(min(total_score / MAX_SCORE, 1.0))
         st.caption(f"Score: {total_score} / {MAX_SCORE}")
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
-        st.markdown(
-            f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
-            unsafe_allow_html=True,
-        )
+        
+        if is_offline:
+            # Offline Mode: Show warning and use typewriter effect
+            st.warning("⚠️ Rakshak Sahayak is currently offline. Showing locally generated guidance.")
+            st.caption("Your assessment has been saved. Here is your personalized support message:")
+            
+            # Use container to hold the typewriter stream
+            with st.container():
+                st.write_stream(typewriter_text(ai_text), cursor="▋")
+        else:
+            # Online Mode: Normal display
+            st.markdown(
+                f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
+                unsafe_allow_html=True,
+            )
 
         if category == "Critical Distress":
             st.error(
@@ -622,6 +694,7 @@ with tab_assess:
             st.session_state.answers = {}
             st.session_state.q_index = 0
             st.rerun()
+
 
 with tab_dashboard:
     
@@ -665,6 +738,7 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
+
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -679,6 +753,7 @@ with tab_admin:
     if "ADMIN_PASSWORD" not in st.secrets:
         st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
         st.stop()
+    
     
     
     try:
