@@ -233,7 +233,7 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
         genai.configure(api_key=api_key)
 
         
-        model = genai.GenerativeModel('gemini-3.6-flash')
+        model = genai.GenerativeModel('gemini-3.8-flash')
 
         # Construct the full prompt
         full_prompt = f"{system_prompt}\n\nUser Request: {user_prompt}"
