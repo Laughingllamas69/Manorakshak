@@ -86,7 +86,7 @@ def get_all_assessments():
 
 # ----------------------------------------------
 
-HASH_PEPER = os.getenv("HASH_PEPER")  # optional; if missing, use plain SHA-256
+HASH_PEPER = os.getenv("HASH_PEPER")
 
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
@@ -181,8 +181,6 @@ QUESTIONS = [
 ]
 
 MAX_SCORE = len(QUESTIONS) * 3
-# Adjusted thresholds for 15 questions (Max 45)
-# 0-10: Low, 11-21: Moderate, 22-33: High, 34+: Critical
 SCORE_CATEGORIES = [
     (0, 10, "Low Stress", "🟢"),
     (11, 21, "Moderate Fatigue", "🟡"),
@@ -205,7 +203,6 @@ SOP_RESETS = [
 ]
 
 def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
-    """Call Google Gemini API. Returns text or None on failure."""
     try:
         api_key = None
         try:
@@ -219,8 +216,6 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
             return None
 
         genai.configure(api_key=api_key)
-
-        # Use a valid model name. 'gemini-2.5-flash-lite' is current as of 2026.
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
         full_prompt = f"{system_prompt}\n\nUser Request: {user_prompt}"
@@ -263,7 +258,6 @@ readiness, not weakness. Do not be preachy about this — one sentence is enough
 """
 
 def build_debrief_prompt(category: str, responses: dict) -> str:
-    """Build the prompt from category + top 3 concerns."""
     scored_items = []
     for q in QUESTIONS:
         q_id = q["id"]
@@ -288,7 +282,6 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
 
     concerns_text = "\n".join(concerns_list)
 
-    # Pass empty system prompt; persona is already in the prompt text below
     prompt = f"""{RAKSHAK_SAHAYAK_PERSONA}
 
 An officer has just completed a confidential wellness screener.
@@ -302,11 +295,7 @@ Write their confidential debrief now, addressed directly to them ("you").
     return prompt
 
 def get_ai_debrief(category: str, responses: dict) -> str:
-    """
-    Calls the Google Gemini server. If it fails, returns the offline template.
-    """
     prompt = build_debrief_prompt(category, responses)
-    # Pass empty system_prompt to avoid duplication; persona is embedded in prompt
     ai_response = get_gemini_response("", prompt)
     if ai_response and len(ai_response) > 10:
         return ai_response
@@ -345,12 +334,7 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
-# --- Typewriter Effect Helper (Kept for potential future use, but not active now) ---
 def typewriter_text(text: str, delay: float = 0.02):
-    """
-    Generator that yields words of the text with a delay.
-    Used with st.write_stream for a typewriter effect.
-    """
     for word in text.split():
         yield word + " "
         time.sleep(delay)
@@ -362,7 +346,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# No longer calling init_db() — table is created in Supabase
 inject_css()
 
 if "logged_in" not in st.session_state:
@@ -560,7 +543,6 @@ with tab_assess:
             for q in QUESTIONS
         }
 
-        # Get the AI response (or offline fallback)
         ai_text = get_ai_debrief(category, ai_input)
 
         save_assessment(
@@ -581,8 +563,6 @@ with tab_assess:
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
 
-        # Display the result directly, whether it's from AI or offline template.
-        # No warning is shown anymore.
         st.markdown(
             f'<div class="mr-letter">{ai_text}</div><div class="sig">— Rakshak Sahayak</div>',
             unsafe_allow_html=True,
@@ -621,7 +601,6 @@ with tab_dashboard:
     if history_df.empty:
         st.info("No check-ins yet. [Complete a screener →](#tab_assess)")
     else:
-        # Convert to tz-aware datetime
         history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], utc=True)
         chart_df = history_df.set_index("timestamp")[["total_score"]].rename(
             columns={"total_score": "Stress Score"}
@@ -716,9 +695,3 @@ with tab_admin:
             all_df["date"] = all_df["timestamp"].dt.date
             daily_counts = all_df.groupby("date").size()
             st.line_chart(daily_counts)
-
-            # Removed raw records expander to honor "aggregate only" promise
-            # If you still want a raw view, you can re-add it, but be aware it exposes all hashed records.
-
-::search[Supabase Postgres RLS mental health data security]{type=web}
-::search[Streamlit Supabase secrets management 2026]{type=web}
