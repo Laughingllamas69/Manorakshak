@@ -3,24 +3,22 @@ ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Port
 
 For Police Personnel & Armed Forces
 
-
 Updated to use Google Gemini AI and expanded to 15 questions.
-
 Removed the "Offline Mode" warning message. The app now seamlessly displays 
 the AI response or the offline template without interrupting the user experience.
-"""
 
+Migrated from SQLite to Supabase (Postgres) for durable, secure storage.
+"""
 
 import os
 import json
-import sqlite3
 import hashlib
 import time  # Kept in case you want to use typewriter for future features
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 import google.generativeai as genai
-
+from supabase import create_client, Client
 
 try:
     from app_ui import inject_css, hero_header
@@ -28,17 +26,13 @@ except ImportError:
     st.error("Error: 'app_ui.py' module not found. Please ensure it exists in the same directory.")
     st.stop()
 
-
-DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
-
 
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
-
 
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
@@ -47,75 +41,59 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
-
-def get_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    return conn
-
-
-def init_db():
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS assessments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            department TEXT,
-            timestamp TEXT NOT NULL,
-            total_score INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            responses TEXT,
-            ai_recommendation TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
+# ---------- Supabase (replaces sqlite3) ----------
+@st.cache_resource(show_spinner=False)
+def get_supabase() -> Client:
+    """One shared client for the whole app. Secrets live in secrets.toml."""
+    url = st.secrets.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY")
+    if not url or not key:
+        st.error("SUPABASE_URL / SUPABASE_KEY missing from secrets.toml")
+        st.stop()
+    return create_client(url, key)
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO assessments (user_id, department, timestamp, total_score, category, responses, ai_recommendation)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            user_id,
-            department,
-            datetime.now().isoformat(timespec="seconds"),
-            total_score,
-            category,
-            json.dumps(responses_dict, ensure_ascii=False),
-            ai_text,
-        ),
-    )
-    conn.commit()
-    conn.close()
-
+    get_supabase().table("assessments").insert({
+        "user_id": user_id,
+        "department": department,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "total_score": int(total_score),
+        "category": category,
+        "responses": responses_dict,        # dict -> jsonb, no json.dumps needed
+        "ai_recommendation": ai_text,
+    }).execute()
 
 def get_user_history(user_id):
-    conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT * FROM assessments WHERE user_id = ? ORDER BY timestamp ASC",
-        conn,
-        params=(user_id,),
+    res = (
+        get_supabase()
+        .table("assessments")
+        .select("id,user_id,department,timestamp,total_score,category,responses,ai_recommendation")
+        .eq("user_id", user_id)
+        .order("timestamp")
+        .execute()
     )
-    conn.close()
-    return df
-
+    return pd.DataFrame(res.data or [])
 
 def get_all_assessments():
-    conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
-    conn.close()
-    return df
+    res = (
+        get_supabase()
+        .table("assessments")
+        .select("id,user_id,department,timestamp,total_score,category")
+        .order("timestamp")
+        .execute()
+    )
+    return pd.DataFrame(res.data or [])
 
+# ----------------------------------------------
+
+HASH_PEPER = os.getenv("HASH_PEPER")  # optional; if missing, use plain SHA-256
 
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
-    return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
-
+    h = hashlib.sha256(raw_id.encode("utf-8"))
+    if HASH_PEPER:
+        h.update(HASH_PEPER.encode("utf-8"))
+    return "OFC-" + h.hexdigest()[:10].upper()
 
 ANSWER_SCALE = [
     "Not at all",
@@ -123,9 +101,6 @@ ANSWER_SCALE = [
     "More than half the days",
     "Nearly every day",
 ]
-
-
-
 
 QUESTIONS = [
     {
@@ -178,8 +153,6 @@ QUESTIONS = [
         "text": "Physical exhaustion affecting your alertness, focus, or performance on duty",
         "domain": "Burnout",
     },
-    
-
     {
         "id": "q11",
         "text": "Relying on alcohol, tobacco, or other substances to cope with stress or sleep",
@@ -207,7 +180,6 @@ QUESTIONS = [
     },
 ]
 
-
 MAX_SCORE = len(QUESTIONS) * 3
 # Adjusted thresholds for 15 questions (Max 45)
 # 0-10: Low, 11-21: Moderate, 22-33: High, 34+: Critical
@@ -218,13 +190,11 @@ SCORE_CATEGORIES = [
     (34, MAX_SCORE, "Critical Distress", "🔴"),
 ]
 
-
 def score_to_category(total_score: int):
     for low, high, label, emoji in SCORE_CATEGORIES:
         if low <= total_score <= high:
             return label, emoji
     return "Unknown", "⚪"
-
 
 SOP_RESETS = [
     "**Box Breathing (Tactical Reset):** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4–6 cycles before/after a high-stress call.",
@@ -234,36 +204,27 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-
 def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
     """Call Google Gemini API. Returns text or None on failure."""
     try:
-        # Initialize the client
         api_key = None
-        
-        # Try to get from secrets first
         try:
             api_key = st.secrets.get("GEMINI_API_KEY")
         except:
             pass
-        
-        # Fallback to environment variable
         if not api_key:
             api_key = os.getenv("GEMINI_API_KEY")
-
         if not api_key:
             print("Error: GEMINI_API_KEY not found in secrets or environment variables.")
             return None
 
         genai.configure(api_key=api_key)
 
-        
-        model = genai.GenerativeModel('Gemini-3.1-Flash Lite')
+        # Use a valid model name. 'gemini-2.5-flash-lite' is current as of 2026.
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
-        # Construct the full prompt
         full_prompt = f"{system_prompt}\n\nUser Request: {user_prompt}"
 
-        # Generate response
         response = model.generate_content(
             full_prompt,
             generation_config=genai.GenerationConfig(
@@ -281,7 +242,6 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
     except Exception as e:
         print(f"Gemini Error: {e}")
         return None
-
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
@@ -302,7 +262,6 @@ support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
-
 def build_debrief_prompt(category: str, responses: dict) -> str:
     """Build the prompt from category + top 3 concerns."""
     scored_items = []
@@ -312,14 +271,12 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
             score_val = responses[q_id]
             if isinstance(score_val, dict):
                 score_val = score_val.get("score", 0)
-
             scored_items.append({
                 "question": q["text"],
                 "domain": q["domain"],
                 "score": score_val
             })
 
-    
     scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
 
@@ -329,9 +286,9 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
         label = ANSWER_SCALE[score_val] if score_val < len(ANSWER_SCALE) else "Unknown"
         concerns_list.append(f"- {item['domain']}: \"{item['question']}\" — reported as \"{label}\"")
 
-    
     concerns_text = "\n".join(concerns_list)
 
+    # Pass empty system prompt; persona is already in the prompt text below
     prompt = f"""{RAKSHAK_SAHAYAK_PERSONA}
 
 An officer has just completed a confidential wellness screener.
@@ -344,20 +301,16 @@ Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
-
 def get_ai_debrief(category: str, responses: dict) -> str:
     """
     Calls the Google Gemini server. If it fails, returns the offline template.
     """
     prompt = build_debrief_prompt(category, responses)
-    
-    ai_response = get_gemini_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
-    
+    # Pass empty system_prompt to avoid duplication; persona is embedded in prompt
+    ai_response = get_gemini_response("", prompt)
     if ai_response and len(ai_response) > 10:
         return ai_response
-    
     return _offline_debrief(category)
-
 
 def _offline_debrief(category: str) -> str:
     templates = {
@@ -392,7 +345,6 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
-
 # --- Typewriter Effect Helper (Kept for potential future use, but not active now) ---
 def typewriter_text(text: str, delay: float = 0.02):
     """
@@ -403,7 +355,6 @@ def typewriter_text(text: str, delay: float = 0.02):
         yield word + " "
         time.sleep(delay)
 
-
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
@@ -411,10 +362,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-
-init_db()
+# No longer calling init_db() — table is created in Supabase
 inject_css()
-
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -422,7 +371,6 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = ""
 if "department" not in st.session_state:
     st.session_state.department = ""
-
 
 with st.sidebar:
     st.markdown("## 🛡️ ManoRakshak")
@@ -452,25 +400,21 @@ with st.sidebar:
         st.caption(f"Department: {st.session_state.department}")
 
         if st.button("🚪 End Session", use_container_width=True):
-
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
                     del st.session_state[key]
-
-                st.session_state.logged_in = False
-                st.session_state.user_id = ""
-                st.session_state.department = ""
-                st.rerun()
+            st.session_state.logged_in = False
+            st.session_state.user_id = ""
+            st.session_state.department = ""
+            st.rerun()
 
     st.divider()
     st.markdown("#### 🚨 In Crisis Right Now?")
     for h in HELPLINES:
         st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
 
-
 st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
-
 
 if not st.session_state.logged_in:
     hero_header(
@@ -527,7 +471,6 @@ if not st.session_state.logged_in:
 
     st.stop()
 
-
 tab_assess, tab_dashboard, tab_admin = st.tabs(
     [
         "📝 Wellness Screener",
@@ -536,18 +479,14 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
     ]
 )
 
-
 with tab_assess:
     st.markdown("### Confidential Duty Wellness Check-In")
     st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
 
-
-    
     if "answers" not in st.session_state:
         st.session_state.answers = {}
     if "q_index" not in st.session_state:
         st.session_state.q_index = 0
-    
 
     if not st.session_state.get("processing"):
         current_q = st.session_state.q_index
@@ -575,7 +514,7 @@ with tab_assess:
             unsafe_allow_html=True,
         )
 
-        answer = st.radio(         
+        answer = st.radio(          
             "How often...",
             options=list(range(4)),
             format_func=lambda i: ANSWER_SCALE[i],
@@ -608,14 +547,10 @@ with tab_assess:
                     st.session_state.processing = True
                     st.rerun()
 
-    
     if st.session_state.get("processing"):
-        
-
         total_score = sum(v for v in st.session_state.answers.values() if v is not None)
         category, emoji = score_to_category(total_score)
 
-       
         ai_input = {
             q["id"]: {
                 "question": q["text"],
@@ -626,7 +561,6 @@ with tab_assess:
         }
 
         # Get the AI response (or offline fallback)
-        # We no longer check if it's offline to show a warning; we just display the result
         ai_text = get_ai_debrief(category, ai_input)
 
         save_assessment(
@@ -646,7 +580,7 @@ with tab_assess:
         st.caption(f"Score: {total_score} / {MAX_SCORE}")
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
-        
+
         # Display the result directly, whether it's from AI or offline template.
         # No warning is shown anymore.
         st.markdown(
@@ -664,7 +598,6 @@ with tab_assess:
 
         st.success("This check-in has been saved to your private wellness trend.")
 
-        
         b1, b2 = st.columns(2)
         if b1.button("🔄 Take check-in again", use_container_width=True):
             st.session_state.answers = {}
@@ -673,11 +606,10 @@ with tab_assess:
         if b2.button("📊 Go to my dashboard", use_container_width=True):
             st.session_state.answers = {}
             st.session_state.q_index = 0
+            st.query_params["tab"] = "tab_dashboard"
             st.rerun()
 
-
 with tab_dashboard:
-    
     if not st.session_state.logged_in:
         st.warning("Please log in to view your dashboard.")
         st.stop()
@@ -689,7 +621,8 @@ with tab_dashboard:
     if history_df.empty:
         st.info("No check-ins yet. [Complete a screener →](#tab_assess)")
     else:
-        history_df["timestamp"] = pd.to_datetime(history_df["timestamp"])
+        # Convert to tz-aware datetime
+        history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], utc=True)
         chart_df = history_df.set_index("timestamp")[["total_score"]].rename(
             columns={"total_score": "Stress Score"}
         )
@@ -718,7 +651,6 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
-
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -727,24 +659,22 @@ with tab_admin:
         "welfare planning without compromising any single officer's privacy."
     )
 
+    import secrets as py_secrets
     admin_password = st.text_input("Admin Password", type="password", key="admin_pw")
 
-    
     if "ADMIN_PASSWORD" not in st.secrets:
         st.error("⚠️ Admin access requires a password to be configured in `secrets.toml`. Contact the system administrator.")
         st.stop()
-    
-    
-    
+
     try:
-        expected_password = st.secrets.get("ADMIN_PASSWORD")
+        expected_password = str(st.secrets.get("ADMIN_PASSWORD"))
     except Exception:
         st.error("Admin password not found in secrets.toml.")
         st.stop()
 
     if admin_password == "":
         st.info("Enter the admin password to view aggregate analytics.")
-    elif admin_password != expected_password:
+    elif not py_secrets.compare_digest(admin_password, expected_password):
         st.error("Incorrect password.")
     else:
         all_df = get_all_assessments()
@@ -782,11 +712,13 @@ with tab_admin:
 
             st.divider()
             st.markdown("#### Screenings Over Time")
-            all_df["timestamp"] = pd.to_datetime(all_df["timestamp"])
+            all_df["timestamp"] = pd.to_datetime(all_df["timestamp"], utc=True)
             all_df["date"] = all_df["timestamp"].dt.date
             daily_counts = all_df.groupby("date").size()
             st.line_chart(daily_counts)
 
-            with st.expander("📋 Raw anonymized records (no names, badge numbers hashed)"):
-                safe_cols = ["user_id", "department", "timestamp", "total_score", "category"]
-                st.dataframe(all_df[safe_cols], use_container_width=True, hide_index=True)
+            # Removed raw records expander to honor "aggregate only" promise
+            # If you still want a raw view, you can re-add it, but be aware it exposes all hashed records.
+
+::search[Supabase Postgres RLS mental health data security]{type=web}
+::search[Streamlit Supabase secrets management 2026]{type=web}
