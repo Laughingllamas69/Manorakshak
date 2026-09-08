@@ -1,26 +1,22 @@
 """
 ManoRakshak (मनोरक्षक) — Mental Health & Wellness Support Portal
-
 For Police Personnel & Armed Forces
 
-
-Updated to use Google Gemini AI and expanded to 15 questions.
-
+Updated to use Hugging Face Inference API instead of Google Gemini.
+Expanded to 15 questions.
 Removed the "Offline Mode" warning message. The app now seamlessly displays 
 the AI response or the offline template without interrupting the user experience.
 """
-
 
 import os
 import json
 import sqlite3
 import hashlib
-import time  # Kept in case you want to use typewriter for future features
+import time
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-import google.generativeai as genai
-
+import requests
 
 try:
     from app_ui import inject_css, hero_header
@@ -28,17 +24,14 @@ except ImportError:
     st.error("Error: 'app_ui.py' module not found. Please ensure it exists in the same directory.")
     st.stop()
 
-
 DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak | मनोरक्षक"
 APP_SUBTITLE = "Confidential Mental Wellness Support for Police & Armed Forces Personnel"
-
 
 DEPARTMENTS = [
     "State Police", "CRPF", "BSF", "CISF", "ITBP", "SSB",
     "Indian Army", "Indian Navy", "Indian Air Force", "Other / Prefer not to say",
 ]
-
 
 HELPLINES = [
     {"name": "Tele-MANAS (Govt. of India Mental Health Helpline)", "number": "14416"},
@@ -47,11 +40,9 @@ HELPLINES = [
     {"name": "Department In-house Peer Support Cell", "number": "Contact your unit welfare officer"},
 ]
 
-
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
-
 
 def init_db():
     conn = get_connection()
@@ -70,7 +61,6 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
     conn = get_connection()
@@ -93,7 +83,6 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
     conn.commit()
     conn.close()
 
-
 def get_user_history(user_id):
     conn = get_connection()
     df = pd.read_sql_query(
@@ -104,18 +93,15 @@ def get_user_history(user_id):
     conn.close()
     return df
 
-
 def get_all_assessments():
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
     conn.close()
     return df
 
-
 def hash_pseudonym(raw_id: str) -> str:
     raw_id = raw_id.strip().lower()
     return "OFC-" + hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:10].upper()
-
 
 ANSWER_SCALE = [
     "Not at all",
@@ -123,9 +109,6 @@ ANSWER_SCALE = [
     "More than half the days",
     "Nearly every day",
 ]
-
-
-
 
 QUESTIONS = [
     {
@@ -145,7 +128,7 @@ QUESTIONS = [
     },
     {
         "id": "q4",
-        "text": "Not being able to stop or control worrying",
+        "text": "Not being able to stop or controlling worrying",
         "domain": "Anxiety",
     },
     {
@@ -178,8 +161,6 @@ QUESTIONS = [
         "text": "Physical exhaustion affecting your alertness, focus, or performance on duty",
         "domain": "Burnout",
     },
-    
-
     {
         "id": "q11",
         "text": "Relying on alcohol, tobacco, or other substances to cope with stress or sleep",
@@ -207,7 +188,6 @@ QUESTIONS = [
     },
 ]
 
-
 MAX_SCORE = len(QUESTIONS) * 3
 # Adjusted thresholds for 15 questions (Max 45)
 # 0-10: Low, 11-21: Moderate, 22-33: High, 34+: Critical
@@ -218,13 +198,11 @@ SCORE_CATEGORIES = [
     (34, MAX_SCORE, "Critical Distress", "🔴"),
 ]
 
-
 def score_to_category(total_score: int):
     for low, high, label, emoji in SCORE_CATEGORIES:
         if low <= total_score <= high:
             return label, emoji
     return "Unknown", "⚪"
-
 
 SOP_RESETS = [
     "**Box Breathing (Tactical Reset):** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4–6 cycles before/after a high-stress call.",
@@ -234,54 +212,81 @@ SOP_RESETS = [
     "**Peer Check-In Protocol:** After a critical incident, a structured 10-minute peer debrief within 24–72 hours significantly reduces long-term impact.",
 ]
 
-
-def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
-    """Call Google Gemini API. Returns text or None on failure."""
+def get_huggingface_response(system_prompt: str, user_prompt: str) -> str | None:
+    """
+    Calls Hugging Face Inference API. Returns text or None on failure.
+    Uses 'mistralai/Mistral-7B-Instruct-v0.3' or 'google/gemma-2b-it' as default.
+    """
     try:
-        # Initialize the client
+        # 1. Get API Key
         api_key = None
         
-        # Try to get from secrets first
         try:
-            api_key = st.secrets.get("GEMINI_API_KEY")
+            api_key = st.secrets.get("HUGGINGFACE_API_KEY")
         except:
             pass
         
-        # Fallback to environment variable
         if not api_key:
-            api_key = os.getenv("GEMINI_API_KEY")
-
+            api_key = os.getenv("HUGGINGFACE_API_KEY")
+        
         if not api_key:
-            print("Error: GEMINI_API_KEY not found in secrets or environment variables.")
+            print("Error: HUGGINGFACE_API_KEY not found in secrets or environment variables.")
             return None
 
-        genai.configure(api_key=api_key)
-
+        # 2. Define Model
+        # Options: "mistralai/Mistral-7B-Instruct-v0.3", "google/gemma-2b-it", "meta-llama/Llama-3.2-3B-Instruct"
+        model_id = "mistralai/Mistral-7B-Instruct-v0.3" 
         
-        model = genai.GenerativeModel('Gemini-3.1-Flash Lite')
+        # 3. Construct the prompt in a format HF models understand
+        # Most instruct models work well with a simple separator or chat format.
+        # We will use a clear structure.
+        full_prompt = f"""
+{system_prompt}
 
-        # Construct the full prompt
-        full_prompt = f"{system_prompt}\n\nUser Request: {user_prompt}"
+User Request:
+{user_prompt}
 
-        # Generate response
-        response = model.generate_content(
-            full_prompt,
-            generation_config=genai.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=500
-            )
-        )
+Response:
+"""
 
-        if response and response.text:
-            return response.text.strip()
+        # 4. Call HF Inference API
+        url = f"https://api-inference.huggingface.co/models/{model_id}/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+        # Construct payload for Chat Completions API (standard for HF Inference)
+        payload = {
+            "model": model_id,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "stop": ["User:", "</s>"] # Stop if it tries to generate user text
+        }
+
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                return content.strip()
+            else:
+                print("HF API returned empty choices.")
+                return None
         else:
-            print("Gemini returned empty response.")
+            print(f"Hugging Face API Error: {response.status_code} - {response.text}")
             return None
 
     except Exception as e:
-        print(f"Gemini Error: {e}")
+        print(f"Hugging Face Error: {e}")
         return None
-
 
 RAKSHAK_SAHAYAK_PERSONA = """
 You are "Rakshak Sahayak", a warm, confidential, trauma-informed debriefing
@@ -302,7 +307,6 @@ support contact, and mention that reaching out is a sign of operational
 readiness, not weakness. Do not be preachy about this — one sentence is enough.
 """
 
-
 def build_debrief_prompt(category: str, responses: dict) -> str:
     """Build the prompt from category + top 3 concerns."""
     scored_items = []
@@ -319,7 +323,6 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
                 "score": score_val
             })
 
-    
     scored_items.sort(key=lambda x: x["score"], reverse=True)
     top_concerns = scored_items[:3]
 
@@ -329,11 +332,9 @@ def build_debrief_prompt(category: str, responses: dict) -> str:
         label = ANSWER_SCALE[score_val] if score_val < len(ANSWER_SCALE) else "Unknown"
         concerns_list.append(f"- {item['domain']}: \"{item['question']}\" — reported as \"{label}\"")
 
-    
     concerns_text = "\n".join(concerns_list)
 
-    prompt = f"""{RAKSHAK_SAHAYAK_PERSONA}
-
+    prompt = f"""
 An officer has just completed a confidential wellness screener.
 Overall result category: {category}
 
@@ -344,20 +345,19 @@ Write their confidential debrief now, addressed directly to them ("you").
 """
     return prompt
 
-
 def get_ai_debrief(category: str, responses: dict) -> str:
     """
-    Calls the Google Gemini server. If it fails, returns the offline template.
+    Calls the Hugging Face server. If it fails, returns the offline template.
     """
     prompt = build_debrief_prompt(category, responses)
     
-    ai_response = get_gemini_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
+    # Pass the persona separately as system prompt
+    ai_response = get_huggingface_response(RAKSHAK_SAHAYAK_PERSONA, prompt)
     
     if ai_response and len(ai_response) > 10:
         return ai_response
     
     return _offline_debrief(category)
-
 
 def _offline_debrief(category: str) -> str:
     templates = {
@@ -392,7 +392,6 @@ def _offline_debrief(category: str) -> str:
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
-
 # --- Typewriter Effect Helper (Kept for potential future use, but not active now) ---
 def typewriter_text(text: str, delay: float = 0.02):
     """
@@ -403,7 +402,6 @@ def typewriter_text(text: str, delay: float = 0.02):
         yield word + " "
         time.sleep(delay)
 
-
 st.set_page_config(
     page_title="ManoRakshak",
     page_icon="🛡️",
@@ -411,10 +409,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-
 init_db()
 inject_css()
-
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -422,7 +418,6 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = ""
 if "department" not in st.session_state:
     st.session_state.department = ""
-
 
 with st.sidebar:
     st.markdown("## 🛡️ ManoRakshak")
@@ -452,11 +447,9 @@ with st.sidebar:
         st.caption(f"Department: {st.session_state.department}")
 
         if st.button("🚪 End Session", use_container_width=True):
-
             for key in list(st.session_state.keys()):
                 if key not in ["logged_in", "user_id", "department"]:
                     del st.session_state[key]
-
                 st.session_state.logged_in = False
                 st.session_state.user_id = ""
                 st.session_state.department = ""
@@ -467,10 +460,8 @@ with st.sidebar:
     for h in HELPLINES:
         st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
 
-
 st.title("🛡️ ManoRakshak (मनोरक्षक)")
 st.caption(APP_SUBTITLE)
-
 
 if not st.session_state.logged_in:
     hero_header(
@@ -527,7 +518,6 @@ if not st.session_state.logged_in:
 
     st.stop()
 
-
 tab_assess, tab_dashboard, tab_admin = st.tabs(
     [
         "📝 Wellness Screener",
@@ -536,11 +526,9 @@ tab_assess, tab_dashboard, tab_admin = st.tabs(
     ]
 )
 
-
 with tab_assess:
     st.markdown("### Confidential Duty Wellness Check-In")
     st.caption("Over the **last 2 weeks**, how often have you been bothered by any of the following?")
-
 
     
     if "answers" not in st.session_state:
@@ -647,6 +635,7 @@ with tab_assess:
 
         st.markdown("### 🤝 A Message from Rakshak Sahayak")
         
+
         # Display the result directly, whether it's from AI or offline template.
         # No warning is shown anymore.
         st.markdown(
@@ -674,7 +663,6 @@ with tab_assess:
             st.session_state.answers = {}
             st.session_state.q_index = 0
             st.rerun()
-
 
 with tab_dashboard:
     
@@ -718,7 +706,6 @@ with tab_dashboard:
         col = hc1 if i % 2 == 0 else hc2
         col.markdown(f"**{h['name']}**  \n📞 `{h['number']}`")
 
-
 with tab_admin:
     st.subheader("🔐 Command-Level Wellness Analytics")
     st.caption(
@@ -735,6 +722,7 @@ with tab_admin:
         st.stop()
     
     
+
     
     try:
         expected_password = st.secrets.get("ADMIN_PASSWORD")
@@ -790,5 +778,3 @@ with tab_admin:
             with st.expander("📋 Raw anonymized records (no names, badge numbers hashed)"):
                 safe_cols = ["user_id", "department", "timestamp", "total_score", "category"]
                 st.dataframe(all_df[safe_cols], use_container_width=True, hide_index=True)
-
-
