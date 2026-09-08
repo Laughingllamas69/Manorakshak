@@ -235,7 +235,7 @@ def get_huggingface_response(system_prompt: str, user_prompt: str) -> str | None
 
         # 2. Define Model
         # Options: "mistralai/Mistral-7B-Instruct-v0.3", "google/gemma-2b-it", "meta-llama/Llama-3.2-3B-Instruct"
-        model_id = "mistralai/Mistral-7B-Instruct-v0.3" 
+        model_id = "google/gemma-2b-it" 
         
         # 3. Construct the prompt in a format HF models understand
         # Most instruct models work well with a simple separator or chat format.
