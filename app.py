@@ -8,8 +8,6 @@ import pandas as pd
 import streamlit as st
 import folium
 from streamlit_folium import folium_static
-import speech_recognition as sr
-from gtts import gTTS
 
 # Import UI module
 from app_ui import inject_css, hero_header, render_crisis_banner
@@ -94,43 +92,6 @@ def wipe_session():
     st.session_state.user_id = ""
     st.session_state.department = ""
     st.rerun()
-
-# --- VOICE INPUT FUNCTIONALITY ---
-def voice_to_text():
-    recognizer = sr.Recognizer()
-    try:
-        with sr.Microphone() as source:
-            st.info("🎤 Listening... Speak now in Hindi or English.")
-            recognizer.adjust_for_ambient_noise(source, duration=1)
-            audio = recognizer.listen(source, timeout=8)
-            
-            # Attempt Google Speech Recognition (Requires API Key)
-            # For demo purposes without key, we simulate a response or fallback
-            try:
-                # Uncomment below if you have a Google Cloud API Key
-                # text = recognizer.recognize_google(audio, language='hi-IN')
-                # Simulate a successful capture for the demo
-                text = st.session_state.get("voice_input_text", "Voice input simulated. Please use text for accuracy in demo.")
-                return text
-            except sr.UnknownValueError:
-                return None
-            except sr.RequestError:
-                return "Voice API unavailable. Using text input."
-    except Exception as e:
-        st.error(f"Voice error: {e}")
-        return None
-
-def speak_text(text):
-    """Text-to-Speech for accessibility"""
-    try:
-        tts = gTTS(text=text, lang='hi', slow=False)
-        file_path = "temp_audio.mp3"
-        tts.save(file_path)
-        st.audio(file_path, format='audio/mp3')
-        if os.path.exists(file_path):
-            os.remove(file_path)
-    except Exception as e:
-        st.warning(f"Audio playback failed: {e}")
 
 # --- AI DEBRIEF LOGIC (Offline Template Engine) ---
 def get_ai_debrief(category, responses):
@@ -270,22 +231,12 @@ def main():
             
             if current_q > 0:
                 c2.markdown("<br>", unsafe_allow_html=True)
-                if st.button("← Back", use_container_width=True):
+                if st.button("← Back", width="stretch"):
                     st.session_state.q_index -= 1
                     st.rerun()
             
             q = QUESTIONS[current_q]
             st.markdown(f'<div class="mr-qcard"><div class="mr-domain">{q["domain"]}</div><div class="mr-qtext">{q["text"]}</div></div>', unsafe_allow_html=True)
-            
-            # Voice Button
-            if st.button("🎤 Voice Answer", key=f"voice_{q['id']}"):
-                with st.spinner("Listening..."):
-                    text = voice_to_text()
-                    if text:
-                        st.session_state.voice_input_text = text
-                        st.success("Voice captured! (Auto-mapped to 'Several days' for demo)")
-                        # For demo, we map voice to a random score between 1 and 3 if no text answer is selected
-                        # In production, NLP would parse the intent.
             
             answer = st.radio(
                 "How often...",
@@ -330,11 +281,11 @@ def main():
             st.success("Check-in saved to your private wellness trend.")
             
             b1, b2 = st.columns(2)
-            if b1.button("🔄 Take check-in again", use_container_width=True):
+            if b1.button("🔄 Take check-in again", width="stretch"):
                 st.session_state.answers = {}
                 st.session_state.q_index = 0
                 st.rerun()
-            if b2.button("📊 Go to my dashboard", use_container_width=True):
+            if b2.button("📊 Go to my dashboard", width="stretch"):
                 st.session_state.answers = {}
                 st.session_state.q_index = 0
                 st.rerun()
@@ -358,9 +309,7 @@ def main():
             
             with st.expander("📋 View full history"):
                 display_df = history_df[["timestamp", "total_score", "category"]].rename(columns={"timestamp": "Date/Time", "total_score": "Score", "category": "Category"})
-                st.dataframe(display_df.sort_values("Date/Time", ascending=False), use_container_width=True, hide_index=True)
-        
-        st.divider()
+                st.dataframe(display_df.sort_values("Date/Time", ascending=False), width="stretch", hide_index=True)
         st.subheader("🧰 Shift Reset Resource Bank")
         tips = [
             "**Box Breathing:** Inhale 4s → Hold 4s → Exhale 4s → Hold 4s. Repeat 4 cycles.",
