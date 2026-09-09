@@ -28,7 +28,7 @@ HELPLINES = [
     {"name": "Unit Peer Support", "number": "Contact Welfare Officer"}
 ]
 
-# --- QUESTIONS LIST (GLOBAL SCOPE - Moved here!) ---
+# --- QUESTIONS LIST (GLOBAL SCOPE) ---
 QUESTIONS = [
     {"id": "q1", "text": "Little interest or pleasure in doing things you'd normally enjoy", "domain": "Mood"},
     {"id": "q2", "text": "Feeling down, low, or hopeless", "domain": "Mood"},
@@ -117,7 +117,6 @@ def wipe_session():
 
 # --- AI & ML FUNCTIONS ---
 
-# 1. FALLBACK TEMPLATES (Used if AI fails)
 def get_template_fallback(category):
     templates = {
         "Low Stress": "Your readings are steady, Officer. This discipline is commendable. Continue your routine: Box Breathing before calls, consistent sleep, and peer check-ins. Steady as she goes.",
@@ -127,20 +126,11 @@ def get_template_fallback(category):
     }
     return templates.get(category, "Thank you for completing your check-in. Take a moment to breathe.")
 
-# 2. SENTIMENT ANALYSIS (ML Component)
 def analyze_sentiment(responses_dict):
-    """
-    Performs ML-based sentiment analysis on the user's selected answers.
-    Returns sentiment label and confidence score.
-    """
-    # Map numeric scores to text for analysis
     score_map = {0: "Not at all", 1: "Several days", 2: "More than half", 3: "Nearly every day"}
-    
-    # Build text inputs from answers > 0
     text_inputs = []
     for q_id, score in responses_dict.items():
         if score > 0:
-            # Find question text
             q_text = next((q["text"] for q in QUESTIONS if q["id"] == q_id), "")
             text_inputs.append(f"{score_map[score]}: {q_text}")
     
@@ -148,34 +138,23 @@ def analyze_sentiment(responses_dict):
         return {"sentiment": "Neutral", "score": 0.5, "confidence": 1.0}
     
     try:
-        # Use Hugging Face Sentiment Pipeline
         client = InferenceClient(token=st.secrets.get("HF_TOKEN", ""))
-        
-        # Analyze the first 5 inputs to save tokens/time
         results = client.text_classification(text_inputs[:5])
         
-        # Aggregate results
         if not results:
             return {"sentiment": "Neutral", "score": 0.5, "confidence": 0.0}
             
         top_result = results[0]
         
         return {
-            "sentiment": top_result[0]["label"], # e.g., "NEGATIVE" or "POSITIVE"
-            "score": round(top_result[0]["score"], 2), # Confidence
+            "sentiment": top_result[0]["label"],
+            "score": round(top_result[0]["score"], 2),
             "confidence": round(top_result[0]["score"], 2)
         }
     except Exception as e:
-        # Fallback if API fails
         return {"sentiment": "Unknown", "score": 0.0, "confidence": 0.0}
 
-# 3. GENERATIVE AI DEBRIEF (AI Component)
 def get_ai_debrief(category, responses):
-    """
-    Generates a dynamic, empathetic response using a real LLM.
-    Falls back to templates if API fails.
-    """
-    # Prepare context from specific high-score answers
     high_risk_questions = [
         q for q, score in responses.items() if score >= 2
     ]
@@ -185,7 +164,6 @@ def get_ai_debrief(category, responses):
     
     context_text = "\n".join(question_texts) if question_texts else "No specific stressors reported."
     
-    # Construct the prompt
     prompt = f"""
     You are 'Rakshak Sahayak', an AI mental wellness assistant for Indian uniformed personnel (Police, Army, NSG, etc.).
     Tone: Professional, empathetic, respectful, non-judgmental, and concise.
@@ -205,7 +183,6 @@ def get_ai_debrief(category, responses):
     """
 
     try:
-        # Check if token exists
         hf_token = st.secrets.get("HF_TOKEN", "")
         if not hf_token:
             st.warning("⚠️ AI Token not configured. Using fallback templates.")
@@ -214,33 +191,28 @@ def get_ai_debrief(category, responses):
         client = InferenceClient(token=hf_token)
         
         response = client.text_generation(
-            model="google/flan-t5-base", # Lightweight model for reliability
+            model="google/flan-t5-base",
             prompt=prompt,
             max_new_tokens=150,
             temperature=0.7,
             stop=["\n\n"]
         )
         
-        # Sanitize HTML
         return response.replace("<", "&lt;").replace(">", "&gt;").strip()
 
     except Exception as e:
-        # Graceful fallback
         st.warning(f"⚠️ AI Service temporarily unavailable. Using safe fallback response.")
         return get_template_fallback(category)
 
-# --- BUDDY SYSTEM ---
 def find_buddy():
     buddy_names = ["Rakshak-04", "Veer-12", "Navy-09", "Army-21", "BSF-88"]
     return random.choice(buddy_names)
 
-# --- MAIN APPLICATION ---
 def main():
     st.set_page_config(page_title=APP_TITLE, page_icon="🛡️", layout="wide")
     init_db()
     inject_css()
 
-    # Initialize Session State
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
     if "user_id" not in st.session_state:
@@ -248,7 +220,6 @@ def main():
     if "department" not in st.session_state:
         st.session_state.department = ""
 
-    # --- SIDEBAR ---
     with st.sidebar:
         st.markdown("## 🛡️ ManoRakshak")
         st.caption(APP_SUBTITLE)
@@ -281,7 +252,6 @@ def main():
         for h in HELPLINES:
             st.markdown(f"**{h['name']}**  \n📞 {h['number']}")
 
-    # --- LANDING PAGE ---
     if not st.session_state.logged_in:
         hero_header(APP_TITLE, "A confidential wellness check-in for uniformed personnel. Two minutes. No names. No service record.",
                     chips=["🔒 Zero-Knowledge", "🇮🇳 Tele-MANAS 14416", "📊 Anonymous Analytics"])
@@ -308,22 +278,14 @@ def main():
             st.caption("Available in 20+ Indian languages. Confidential.")
         st.stop()
 
-    # --- MAIN TABS ---
     tab_assess, tab_dashboard, tab_admin = st.tabs(
         ["📝 Wellness Screener", "📊 My Dashboard & Buddy", "🔐 Command Analytics"]
     )
 
-    # --- TAB 1: WELLNESS SCREENER ---
     with tab_assess:
         st.markdown("### Confidential Duty Wellness Check-In")
         st.caption("Over the **last 2 weeks**, how often have you been bothered by...")
         
-        # QUESTIONS list is now GLOBAL, so remove this duplicate definition!
-        
-        ANSWER_SCALE is now GLOBAL, so remove this duplicate definition!
-        MAX_SCORE is now GLOBAL, so remove this duplicate definition!
-        SCORE_CATEGORIES is now GLOBAL, so remove this duplicate definition!
-
         if "answers" not in st.session_state:
             st.session_state.answers = {}
         if "q_index" not in st.session_state:
@@ -371,11 +333,9 @@ def main():
             total_score = sum(v for v in st.session_state.answers.values() if v is not None)
             category, emoji = next((label, em) for low, high, label, em in SCORE_CATEGORIES if low <= total_score <= high)
             
-            # --- AI GENERATION ---
             with st.spinner("🤖 Rakshak Sahayak is analyzing your responses..."):
                 ai_text = get_ai_debrief(category, st.session_state.answers)
             
-            # --- ML ANALYSIS ---
             sentiment_result = analyze_sentiment(st.session_state.answers)
             
             save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
@@ -386,7 +346,6 @@ def main():
             st.progress(min(total_score / MAX_SCORE, 1.0))
             st.caption(f"Score: {total_score} / {MAX_SCORE}")
             
-            # ML Insight
             st.metric("🧠 Sentiment Analysis", f"{sentiment_result['sentiment']} (Confidence: {sentiment_result['score']})")
             
             st.markdown("### 🤝 A Message from Rakshak Sahayak")
@@ -407,7 +366,6 @@ def main():
                 st.session_state.q_index = 0
                 st.rerun()
 
-    # --- TAB 2: DASHBOARD & BUDDY ---
     with tab_dashboard:
         st.subheader("📈 Your Wellness Trend")
         history_df = get_user_history(st.session_state.user_id)
@@ -449,7 +407,6 @@ def main():
         st.subheader("📞 Crisis Directory")
         render_crisis_banner(HELPLINES)
 
-    # --- TAB 3: ADMIN ANALYTICS ---
     with tab_admin:
         st.subheader("🔐 Command-Level Wellness Analytics")
         st.caption("Password-protected, aggregate-only view. Individual identities are NEVER shown.")
