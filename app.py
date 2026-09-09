@@ -77,8 +77,8 @@ def init_db():
     conn.close()
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
-    # Sanitize AI text to prevent SQL injection and quote errors
-    safe_ai_text = ai_text.replace("'", "''")  # Escape single quotes
+    # Sanitize AI text to prevent SQL errors
+    safe_ai_text = ai_text.replace("'", "''")
     
     conn = get_connection()
     cur = conn.cursor()
@@ -332,23 +332,19 @@ def main():
                         st.session_state.processing = True
                         st.rerun()
 
-        # Inside the processing block
-if st.session_state.get("processing"):
-    total_score = sum(v for v in st.session_state.answers.values() if v is not None)
-    category, emoji = next((label, em) for low, high, label, em in SCORE_CATEGORIES if low <= total_score <= high)
-    
-    with st.spinner("🤖 Rakshak Sahayak is analyzing your responses..."):
-        ai_text = get_ai_debrief(category, st.session_state.answers)
-    
-    # Ensure ai_text is a string (fallback if None)
-    if ai_text is None:
-        ai_text = "No response generated. Please try again."
-    
-    sentiment_result = analyze_sentiment(st.session_state.answers)
-    
-    save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
-    
-    # ... rest of the code
+        if st.session_state.get("processing"):
+            total_score = sum(v for v in st.session_state.answers.values() if v is not None)
+            category, emoji = next((label, em) for low, high, label, em in SCORE_CATEGORIES if low <= total_score <= high)
+            
+            with st.spinner("🤖 Rakshak Sahayak is analyzing your responses..."):
+                ai_text = get_ai_debrief(category, st.session_state.answers)
+            
+            if ai_text is None:
+                ai_text = "No response generated. Please try again."
+            
+            sentiment_result = analyze_sentiment(st.session_state.answers)
+            
+            save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
             
             st.session_state.processing = False
             st.divider()
