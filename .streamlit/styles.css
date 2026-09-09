@@ -2,43 +2,48 @@ _CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap');
 
+
 :root {
-  --mr-bg-1: #FBF2F5;
-  --mr-bg-2: #F3EAF6;
-  --mr-surface: #FFFDFE;
-  --mr-surface-alt: #FDF7FA;
-  --mr-border: #EEDFF0;
-  --mr-border-soft: #E7D5E8;
-  --mr-accent: #C589B5;        /* darkened from #D8A9C9 for AA contrast on white */
-  --mr-accent-strong: #A8608F; /* darkened from #B4739A */
-  --mr-accent-lav: #8B7ED1;    /* darkened from #9B8FD9 for label contrast */
-  --mr-text-heading: #4A3B52;
-  --mr-text-body: #5B4763;
-  --mr-text-muted: #7A6981;    /* darkened from #8A7791 for AA on light bg */
-  --mr-text-faint: #9A88A2;
-  --mr-crisis-bg: #FFF1F0;
-  --mr-crisis-border: #EFA6A8;
-  --mr-crisis-accent: #D97A81; /* darkened from #E8949A */
-  --mr-crisis-text: #7A3A40;   /* darkened from #8A4A50 */
-  --mr-radius-lg: 18px;
-  --mr-radius-md: 16px;
-  --mr-radius-sm: 12px;
-  --mr-shadow-card: 0 2px 14px rgba(165,96,143,.07);
-  --mr-shadow-hover: 0 6px 20px rgba(165,96,143,.13);
-  --mr-transition: all .18s ease;
+  /* Updated to match reference image - teal/turquoise theme */
+  --mr-bg-1: #F4F6F8;
+  --mr-bg-2: #FFFFFF;
+  --mr-surface: #FFFFFF;
+  --mr-surface-alt: #F8FAFB;
+  --mr-border: #E2E8F0;
+  --mr-border-soft: #CBD5E0;
+  --mr-accent: #008080;        /* Teal primary */
+  --mr-accent-strong: #006666; /* Darker teal */
+  --mr-accent-lav: #008080;    /* Same teal for labels */
+  --mr-text-heading: #2C3E50;
+  --mr-text-body: #2D3748;
+  --mr-text-muted: #4A5568;
+  --mr-text-faint: #718096;
+  --mr-crisis-bg: #FFF5F5;
+  --mr-crisis-border: #FED7D7;
+  --mr-crisis-accent: #E53E3E; /* Red for crisis */
+  --mr-crisis-text: #C53030;
+  --mr-radius-lg: 12px;
+  --mr-radius-md: 8px;
+  --mr-radius-sm: 8px;
+  --mr-shadow-card: 0 2px 4px rgba(0,0,0,0.05);
+  --mr-shadow-hover: 0 4px 6px rgba(0,0,0,0.08);
+  --mr-transition: all 0.2s ease;
 }
+
 
 .block-container { padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1100px; }
 #MainMenu, footer { visibility: hidden; }
 
+
 html, body, [class*="css"] { font-family: 'Inter', 'Noto Sans Devanagari', sans-serif; }
 h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; color: var(--mr-text-heading); }
+
 
 .mr-hero {
   padding: 2.2rem 2.4rem;
   border-radius: var(--mr-radius-lg);
   background:
-    radial-gradient(120% 140% at 0% 0%, rgba(197,137,181,.30) 0%, rgba(197,137,181,0) 55%),
+    radial-gradient(120% 140% at 0% 0%, rgba(0,128,128,.15) 0%, rgba(0,128,128,0) 55%),
     linear-gradient(135deg, var(--mr-bg-1) 0%, var(--mr-bg-2) 100%);
   border: 1px solid var(--mr-border-soft);
   margin-bottom: 1.6rem;
@@ -48,9 +53,10 @@ h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; color: var(--mr-text-hea
 .mr-chip {
   display: inline-block; font-size: .72rem; letter-spacing: .12em;
   text-transform: uppercase; color: var(--mr-accent-strong); font-weight: 600;
-  border: 1px solid var(--mr-accent-strong)44; border-radius: 999px; padding: .22rem .7rem;
+  border: 1px solid var(--mr-accent); border-radius: 999px; padding: .22rem .7rem;
   margin-bottom: .9rem; background: #FFFFFFCC;
 }
+
 
 .mr-trust { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:1.1rem; }
 .mr-trust span {
@@ -59,6 +65,7 @@ h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; color: var(--mr-text-hea
   transition: var(--mr-transition);
 }
 .mr-trust span:hover { border-color: var(--mr-accent); color: var(--mr-accent-strong); }
+
 
 .mr-qcard {
   background:var(--mr-surface); border:1px solid var(--mr-border); border-radius:var(--mr-radius-md);
@@ -69,12 +76,13 @@ h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; color: var(--mr-text-hea
 .mr-qcard:hover { box-shadow: var(--mr-shadow-hover); transform: translateY(-1px); }
 .mr-domain {
   font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--mr-accent-lav); font-weight:600; margin-bottom:.55rem;
+  color:var(--mr-accent); font-weight:600; margin-bottom:.55rem;
 }
 .mr-qtext { font-size:1.28rem; font-weight:500; line-height:1.45; color:var(--mr-text-heading); }
 
+
 .mr-letter {
-  background: linear-gradient(180deg,#FFF8FB 0%, #FBF1F6 100%);
+  background: linear-gradient(180deg,#FFFFFF 0%, #F8FAFB 100%);
   border:1px solid var(--mr-border); border-left:4px solid var(--mr-accent);
   border-radius:14px; padding:1.7rem 1.9rem; line-height:1.72; color:var(--mr-text-body);
 }
@@ -83,12 +91,14 @@ h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; color: var(--mr-text-hea
   font-size:.82rem; color:var(--mr-text-faint); letter-spacing:.04em;
 }
 
+
 .mr-crisis {
   background:var(--mr-crisis-bg); border:1px solid var(--mr-crisis-border);
   border-left:4px solid var(--mr-crisis-accent);
   border-radius:var(--mr-radius-sm); padding:1.1rem 1.4rem;
   color:var(--mr-crisis-text); font-weight: 500;
 }
+
 
 div[data-testid="stMetric"] {
   background:var(--mr-surface); border:1px solid var(--mr-border); border-radius:var(--mr-radius-sm);
@@ -97,7 +107,8 @@ div[data-testid="stMetric"] {
 div[data-testid="stMetric"]:hover { border-color: var(--mr-accent); }
 div[data-testid="stMetricValue"] { font-size:1.6rem; font-weight:600; color:var(--mr-text-body); }
 
-/* form inputs — not covered in original, now themed to match */
+
+/* form inputs — themed to match */
 div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] > div {
   border-radius: 10px !important;
   border-color: var(--mr-border) !important;
@@ -108,18 +119,21 @@ div[data-baseweb="input"]:focus-within,
 div[data-baseweb="textarea"]:focus-within,
 div[data-baseweb="select"] > div:focus-within {
   border-color: var(--mr-accent) !important;
-  box-shadow: 0 0 0 3px rgba(197,137,181,.18) !important;
+  box-shadow: 0 0 0 3px rgba(0,128,128,.18) !important;
 }
 
-/* visible focus ring for keyboard users on interactive elements */
+
+/* visible focus ring for keyboard users */
 button:focus-visible, a:focus-visible, [role="tab"]:focus-visible {
   outline: 2px solid var(--mr-accent-strong);
   outline-offset: 2px;
 }
 
+
 button[data-baseweb="tab"] { font-size:.95rem; font-weight:500; color:var(--mr-text-muted); transition: var(--mr-transition); }
 button[data-baseweb="tab"]:hover { color: var(--mr-accent-strong); }
 div[data-baseweb="tab-highlight"] { background-color: var(--mr-accent); }
+
 
 button[kind="primary"] {
   background:linear-gradient(135deg,var(--mr-accent),var(--mr-accent-strong)) !important;
@@ -134,10 +148,13 @@ button[kind="secondary"] {
 }
 button[kind="secondary"]:hover { border-color: var(--mr-accent) !important; color: var(--mr-accent-strong) !important; }
 
+
 section[data-testid="stSidebar"] { border-right:1px solid var(--mr-border); background:var(--mr-surface-alt); }
 section[data-testid="stSidebar"] hr { margin:1.2rem 0; border-color:var(--mr-border); }
 
+
 #deploy-button, .stDeployButton { display:none; }
+
 
 /* mobile tweaks */
 @media (max-width: 640px) {
@@ -148,23 +165,3 @@ section[data-testid="stSidebar"] hr { margin:1.2rem 0; border-color:var(--mr-bor
 }
 </style>
 """
-
-
-def inject_css():
-    st.markdown(_CSS, unsafe_allow_html=True)
-
-
-def hero_header(title, subtitle, chips=None):
-    chips = chips or []
-    chip_html = "".join(f"<span>{c}</span>" for c in chips)
-    st.markdown(
-        f"""
-        <div class="mr-hero">
-          <div class="mr-chip">A gentle, private space</div>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-          <div class="mr-trust">{chip_html}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
