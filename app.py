@@ -77,8 +77,9 @@ def init_db():
     conn.close()
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
-    # Sanitize AI text to prevent SQL errors
-    safe_ai_text = ai_text.replace("'", "''")
+    
+    safe_responses = json.dumps(responses_dict, ensure_ascii=False)
+    safe_ai_text = json.dumps(ai_text, ensure_ascii=False)  
     
     conn = get_connection()
     cur = conn.cursor()
@@ -86,10 +87,9 @@ def save_assessment(user_id, department, total_score, category, responses_dict, 
         INSERT INTO assessments (user_id, department, timestamp, total_score, category, responses, ai_recommendation, is_encrypted)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (user_id, department, datetime.now().isoformat(), total_score, category, 
-          json.dumps(responses_dict, ensure_ascii=False), safe_ai_text, 1))
+          safe_responses, safe_ai_text, 1))
     conn.commit()
     conn.close()
-
 def get_user_history(user_id):
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM assessments WHERE user_id = ? ORDER BY timestamp ASC", conn, params=(user_id,))
