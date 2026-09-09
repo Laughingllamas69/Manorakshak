@@ -6,8 +6,6 @@ import random
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-import folium
-from streamlit_folium import folium_static
 
 # Import UI module
 from app_ui import inject_css, hero_header, render_crisis_banner
@@ -386,26 +384,10 @@ def main():
                 daily_counts = all_df.groupby("date").size()
                 st.line_chart(daily_counts)
                 
-                # Heatmap (Simulated for demo)
-                st.markdown("#### 🗺️ Wellness Heatmap (India)")
-                st.caption("Visualizing stress density by region (Simulated Data)")
-                try:
-                    m = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
-                    # Add some random markers for demo
-                    for i in range(5):
-                        folium.CircleMarker(
-                            location=[random.uniform(10, 35), random.uniform(70, 90)],
-                            radius=15,
-                            popup=f"High Risk Zone {i+1}",
-                            color="red",
-                            fill=True,
-                            fill_color="red",
-                            fill_opacity=0.5
-                        ).add_to(m)
-                    folium_static(m)
-                except Exception as e:
-                    st.error(f"Map rendering error: {e}")
-                    st.info("Map visualization requires 'streamlit-folium' package.")
+                # Heatmap placeholder removed to avoid optional map dependency.
+                st.markdown("#### 🗺️ Wellness Summary")
+                st.caption("Regional map view removed for a lighter, dependency-free deployment.")
+                st.info("Use the category and department charts above for the live wellness summary.")
 
 if __name__ == "__main__":
     main()
