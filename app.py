@@ -77,13 +77,16 @@ def init_db():
     conn.close()
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
+    # Sanitize AI text to prevent SQL injection and quote errors
+    safe_ai_text = ai_text.replace("'", "''")  # Escape single quotes
+    
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO assessments (user_id, department, timestamp, total_score, category, responses, ai_recommendation, is_encrypted)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (user_id, department, datetime.now().isoformat(), total_score, category, 
-          json.dumps(responses_dict, ensure_ascii=False), ai_text, 1))
+          json.dumps(responses_dict, ensure_ascii=False), safe_ai_text, 1))
     conn.commit()
     conn.close()
 
@@ -329,16 +332,23 @@ def main():
                         st.session_state.processing = True
                         st.rerun()
 
-        if st.session_state.get("processing"):
-            total_score = sum(v for v in st.session_state.answers.values() if v is not None)
-            category, emoji = next((label, em) for low, high, label, em in SCORE_CATEGORIES if low <= total_score <= high)
-            
-            with st.spinner("🤖 Rakshak Sahayak is analyzing your responses..."):
-                ai_text = get_ai_debrief(category, st.session_state.answers)
-            
-            sentiment_result = analyze_sentiment(st.session_state.answers)
-            
-            save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
+        # Inside the processing block
+if st.session_state.get("processing"):
+    total_score = sum(v for v in st.session_state.answers.values() if v is not None)
+    category, emoji = next((label, em) for low, high, label, em in SCORE_CATEGORIES if low <= total_score <= high)
+    
+    with st.spinner("🤖 Rakshak Sahayak is analyzing your responses..."):
+        ai_text = get_ai_debrief(category, st.session_state.answers)
+    
+    # Ensure ai_text is a string (fallback if None)
+    if ai_text is None:
+        ai_text = "No response generated. Please try again."
+    
+    sentiment_result = analyze_sentiment(st.session_state.answers)
+    
+    save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
+    
+    # ... rest of the code
             
             st.session_state.processing = False
             st.divider()
