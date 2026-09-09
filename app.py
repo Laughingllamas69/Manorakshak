@@ -28,6 +28,30 @@ HELPLINES = [
     {"name": "Unit Peer Support", "number": "Contact Welfare Officer"}
 ]
 
+# --- QUESTIONS LIST (GLOBAL SCOPE - Moved here!) ---
+QUESTIONS = [
+    {"id": "q1", "text": "Little interest or pleasure in doing things you'd normally enjoy", "domain": "Mood"},
+    {"id": "q2", "text": "Feeling down, low, or hopeless", "domain": "Mood"},
+    {"id": "q3", "text": "Feeling nervous, anxious, or 'on edge'", "domain": "Anxiety"},
+    {"id": "q4", "text": "Not being able to stop or controlling worrying", "domain": "Anxiety"},
+    {"id": "q5", "text": "Trouble falling or staying asleep due to shift timings", "domain": "Sleep / Fatigue"},
+    {"id": "q6", "text": "Unwanted memories, flashbacks, or distress linked to duty", "domain": "Trauma"},
+    {"id": "q7", "text": "Feeling isolated or disconnected from family/friends", "domain": "Isolation"},
+    {"id": "q8", "text": "Feeling unusually irritable or 'on guard' off duty", "domain": "Hypervigilance"},
+    {"id": "q9", "text": "Feeling emotionally numb or hard to feel positive emotions", "domain": "Emotional"},
+    {"id": "q10", "text": "Physical exhaustion affecting alertness or focus", "domain": "Burnout"},
+    {"id": "q11", "text": "Relying on substances to cope with stress or sleep", "domain": "Substance Use"},
+    {"id": "q12", "text": "Difficulty concentrating or making decisions", "domain": "Cognitive"},
+    {"id": "q13", "text": "Feeling guilty about past actions during an incident", "domain": "Guilt"},
+    {"id": "q14", "text": "Difficulty trusting colleagues or feeling unsupported", "domain": "Team"},
+    {"id": "q15", "text": "Physical symptoms (headaches, stomach issues) without medical cause", "domain": "Psychosomatic"},
+]
+
+ANSWER_SCALE = ["Not at all", "Several days", "More than half", "Nearly every day"]
+MAX_SCORE = len(QUESTIONS) * 3
+SCORE_CATEGORIES = [(0, 10, "Low Stress", "🟢"), (11, 21, "Moderate Fatigue", "🟡"), 
+                    (22, 33, "High Burnout", "🟠"), (34, MAX_SCORE, "Critical Distress", "🔴")]
+
 # --- DATABASE FUNCTIONS ---
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -125,19 +149,15 @@ def analyze_sentiment(responses_dict):
     
     try:
         # Use Hugging Face Sentiment Pipeline
-        # We use a lightweight model for speed
         client = InferenceClient(token=st.secrets.get("HF_TOKEN", ""))
         
         # Analyze the first 5 inputs to save tokens/time
         results = client.text_classification(text_inputs[:5])
         
         # Aggregate results
-        # Take the most frequent sentiment with highest confidence
         if not results:
             return {"sentiment": "Neutral", "score": 0.5, "confidence": 0.0}
             
-        # Simple aggregation: take the first result as representative
-        # In production, you might average scores
         top_result = results[0]
         
         return {
@@ -237,7 +257,7 @@ def main():
         if not st.session_state.logged_in:
             st.markdown("### 🔐 Confidential Check-In")
             st.caption("Identity is one-way hashed. No real names stored.")
-            raw_id = st.text_input("Badge / Jurisdiction", placeholder="e.g. INDIAN POLICE")
+            raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. Falcon-07")
             dept = st.selectbox("Department / Force", DEPARTMENTS)
             
             if st.button("🔓 Enter Confidentially", type="primary"):
@@ -271,7 +291,7 @@ def main():
             st.markdown("#### Begin your check-in")
             st.caption("Use a pseudonym. Your identity is hashed before storage.")
             with st.form("checkin_form"):
-                raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. INDIAN POLICE")
+                raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. Falcon-07")
                 dept = st.selectbox("Department / Force", DEPARTMENTS)
                 go = st.form_submit_button("Enter confidentially →", type="primary")
             
@@ -298,28 +318,11 @@ def main():
         st.markdown("### Confidential Duty Wellness Check-In")
         st.caption("Over the **last 2 weeks**, how often have you been bothered by...")
         
-        QUESTIONS = [
-            {"id": "q1", "text": "Little interest or pleasure in doing things you'd normally enjoy", "domain": "Mood"},
-            {"id": "q2", "text": "Feeling down, low, or hopeless", "domain": "Mood"},
-            {"id": "q3", "text": "Feeling nervous, anxious, or 'on edge'", "domain": "Anxiety"},
-            {"id": "q4", "text": "Not being able to stop or controlling worrying", "domain": "Anxiety"},
-            {"id": "q5", "text": "Trouble falling or staying asleep due to shift timings", "domain": "Sleep / Fatigue"},
-            {"id": "q6", "text": "Unwanted memories, flashbacks, or distress linked to duty", "domain": "Trauma"},
-            {"id": "q7", "text": "Feeling isolated or disconnected from family/friends", "domain": "Isolation"},
-            {"id": "q8", "text": "Feeling unusually irritable or 'on guard' off duty", "domain": "Hypervigilance"},
-            {"id": "q9", "text": "Feeling emotionally numb or hard to feel positive emotions", "domain": "Emotional"},
-            {"id": "q10", "text": "Physical exhaustion affecting alertness or focus", "domain": "Burnout"},
-            {"id": "q11", "text": "Relying on substances to cope with stress or sleep", "domain": "Substance Use"},
-            {"id": "q12", "text": "Difficulty concentrating or making decisions", "domain": "Cognitive"},
-            {"id": "q13", "text": "Feeling guilty about past actions during an incident", "domain": "Guilt"},
-            {"id": "q14", "text": "Difficulty trusting colleagues or feeling unsupported", "domain": "Team"},
-            {"id": "q15", "text": "Physical symptoms (headaches, stomach issues) without medical cause", "domain": "Psychosomatic"},
-        ]
+        # QUESTIONS list is now GLOBAL, so remove this duplicate definition!
         
-        ANSWER_SCALE = ["Not at all", "Several days", "More than half", "Nearly every day"]
-        MAX_SCORE = len(QUESTIONS) * 3
-        SCORE_CATEGORIES = [(0, 10, "Low Stress", "🟢"), (11, 21, "Moderate Fatigue", "🟡"), 
-                            (22, 33, "High Burnout", "🟠"), (34, MAX_SCORE, "Critical Distress", "🔴")]
+        ANSWER_SCALE is now GLOBAL, so remove this duplicate definition!
+        MAX_SCORE is now GLOBAL, so remove this duplicate definition!
+        SCORE_CATEGORIES is now GLOBAL, so remove this duplicate definition!
 
         if "answers" not in st.session_state:
             st.session_state.answers = {}
