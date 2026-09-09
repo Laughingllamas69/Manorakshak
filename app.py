@@ -237,7 +237,7 @@ def main():
         if not st.session_state.logged_in:
             st.markdown("### 🔐 Confidential Check-In")
             st.caption("Identity is one-way hashed. No real names stored.")
-            raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. Falcon-07")
+            raw_id = st.text_input("Badge / Jurisdiction", placeholder="e.g. NOIDA")
             dept = st.selectbox("Department / Force", DEPARTMENTS)
             
             if st.button("🔓 Enter Confidentially", type="primary"):
@@ -271,7 +271,7 @@ def main():
             st.markdown("#### Begin your check-in")
             st.caption("Use a pseudonym. Your identity is hashed before storage.")
             with st.form("checkin_form"):
-                raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. Falcon-07")
+                raw_id = st.text_input("Badge / Pseudonym", placeholder="e.g. NOIDA")
                 dept = st.selectbox("Department / Force", DEPARTMENTS)
                 go = st.form_submit_button("Enter confidentially →", type="primary")
             
