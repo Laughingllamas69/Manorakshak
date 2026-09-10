@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from huggingface_hub import InferenceClient
-from markupsafe import escape  # Added for XSS prevention
+from markupsafe import escape
 
 # Import UI module
 from app_ui import inject_css, hero_header, render_crisis_banner
@@ -18,8 +18,7 @@ DB_PATH = "manorakshak.db"
 APP_TITLE = "ManoRakshak (मनोरक्षक)"
 APP_SUBTITLE = "Confidential Mental Wellness & Peer Support for Uniformed Personnel"
 
-# Security: Environment variable for salt (never commit this)
-# If not set, generate a random one at runtime (not persistent across restarts, but better than hardcoded)
+# Security: Environment variable for salt
 SALT = os.environ.get("APP_SALT", secrets.token_hex(32))
 
 DEPARTMENTS = [
@@ -60,88 +59,123 @@ SCORE_CATEGORIES = [(0, 10, "Low Stress", "🟢"), (11, 21, "Moderate Fatigue", 
 
 # --- DATABASE FUNCTIONS ---
 def get_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    # Security: Enable foreign keys and WAL mode for better concurrency
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
+    """
+    Creates a secure SQLite connection with timeout and WAL mode.
+    """
+    # Ensure directory exists
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    
+    try:
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10.0)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        return conn
+    except sqlite3.Error as e:
+        st.error(f"Database connection failed: {e}")
+        raise
 
 def init_db():
-    conn = get_connection()
-    cur = conn.cursor()
-    # Security: Use parameterized creation (though table names/cols are static here)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS assessments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            department TEXT,
-            timestamp TEXT NOT NULL,
-            total_score INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            responses TEXT,
-            ai_recommendation TEXT,
-            is_encrypted INTEGER DEFAULT 0
-        )
-    """)
-    conn.commit()
-    conn.close()
+    """
+    Initializes the database schema with error handling.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        # Use CREATE TABLE IF NOT EXISTS to avoid errors if table exists
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS assessments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                department TEXT,
+                timestamp TEXT NOT NULL,
+                total_score INTEGER NOT NULL,
+                category TEXT NOT NULL,
+                responses TEXT,
+                ai_recommendation TEXT,
+                is_encrypted INTEGER DEFAULT 0
+            )
+        """)
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Database initialization failed: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
 
 def save_assessment(user_id, department, total_score, category, responses_dict, ai_text):
+    """
+    Saves assessment data with parameterized queries and error handling.
+    """
     safe_responses = json.dumps(responses_dict, ensure_ascii=False)
     safe_ai_text = json.dumps(ai_text, ensure_ascii=False)
 
-    conn = get_connection()
-    cur = conn.cursor()
-    # Security: Parameterized query to prevent SQL injection
-    cur.execute("""
-        INSERT INTO assessments (user_id, department, timestamp, total_score, category, responses, ai_recommendation, is_encrypted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, department, datetime.now().isoformat(), total_score, category, 
-          safe_responses, safe_ai_text, 1))
-    conn.commit()
-    conn.close()
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        # Parameterized query to prevent SQL injection
+        cur.execute("""
+            INSERT INTO assessments (user_id, department, timestamp, total_score, category, responses, ai_recommendation, is_encrypted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, department, datetime.now().isoformat(), total_score, category, 
+              safe_responses, safe_ai_text, 1))
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        st.error(f"Failed to save assessment: {e}. Please try again later.")
+        raise
+    except sqlite3.Error as e:
+        st.error(f"Database error: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
 
 def get_user_history(user_id):
-    conn = get_connection()
-    # Security: Parameterized query
-    df = pd.read_sql_query("SELECT * FROM assessments WHERE user_id = ? ORDER BY timestamp ASC", conn, params=(user_id,))
-    conn.close()
-    return df
+    conn = None
+    try:
+        conn = get_connection()
+        df = pd.read_sql_query("SELECT * FROM assessments WHERE user_id = ? ORDER BY timestamp ASC", conn, params=(user_id,))
+        return df
+    except sqlite3.Error as e:
+        st.error(f"Failed to load history: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
 
 def get_all_assessments():
-    conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
-    conn.close()
-    return df
+    conn = None
+    try:
+        conn = get_connection()
+        df = pd.read_sql_query("SELECT * FROM assessments ORDER BY timestamp ASC", conn)
+        return df
+    except sqlite3.Error as e:
+        st.error(f"Failed to load analytics: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
 
 # --- SECURITY & UTILITIES ---
 def hash_pseudonym(raw_id: str) -> str:
-    """
-    Securely hashes the pseudonym using a random salt and SHA-256.
-    Ensures inputs are cleaned and length-limited.
-    """
     if not raw_id or not isinstance(raw_id, str):
         raise ValueError("Invalid pseudonym input")
     
-    # Clean input: strip whitespace and limit length to prevent DoS
     raw_id = raw_id.strip().lower()
     if len(raw_id) > 50:
         raw_id = raw_id[:50]
     
-    # Security: Use secrets token for salt if not using env var
-    # In production, use a proper password hashing library like bcrypt or argon2
-    # For pseudonyms, a salted hash is sufficient for anonymity
     salt = os.environ.get("APP_SALT", secrets.token_hex(32))
-    
-    # Combine salt and ID
     salted_id = (raw_id + salt).encode("utf-8")
     hash_obj = hashlib.sha256(salted_id)
     
-    # Return unique identifier
     return "OFC-" + hash_obj.hexdigest()[:16].upper()
 
 def wipe_session():
-    # Security: Clear all session state except necessary flags
     keys_to_keep = ["logged_in", "user_id", "department"]
     for key in list(st.session_state.keys()):
         if key not in keys_to_keep:
@@ -167,11 +201,9 @@ def analyze_sentiment(responses_dict):
     score_map = {0: "Not at all", 1: "Several days", 2: "More than half", 3: "Nearly every day"}
     text_inputs = []
     
-    # Security: Validate and limit inputs to prevent prompt injection via responses
     for q_id, score in responses_dict.items():
         if score > 0:
             q_text = next((q["text"] for q in QUESTIONS if q["id"] == q_id), "")
-            # Sanitize the text to prevent injection
             sanitized_text = escape(q_text)
             text_inputs.append(f"{score_map[score]}: {sanitized_text}")
     
@@ -196,19 +228,16 @@ def analyze_sentiment(responses_dict):
         return {"sentiment": "Unknown", "score": 0.0, "confidence": 0.0}
 
 def get_ai_debrief(category, responses):
-    # Security: Filter and sanitize high-risk questions to prevent prompt injection
     high_risk_questions = [
         q for q, score in responses.items() if score >= 2
     ]
     question_texts = []
     for q in QUESTIONS:
         if q["id"] in high_risk_questions:
-            # Sanitize text to prevent prompt injection
             question_texts.append(escape(q["text"]))
     
     context_text = "\n".join(question_texts) if question_texts else "No specific stressors reported."
     
-    # Security: Limit context length to prevent token overflow attacks
     if len(context_text) > 500:
         context_text = context_text[:500] + "..."
 
@@ -247,7 +276,6 @@ def get_ai_debrief(category, responses):
             stop=["\n\n"]
         )
         
-        # Security: Sanitize output to prevent XSS
         return escape(response).replace("<", "&lt;").replace(">", "&gt;").strip()
 
     except Exception as e:
@@ -260,7 +288,14 @@ def find_buddy():
 
 def main():
     st.set_page_config(page_title=APP_TITLE, page_icon="🛡️", layout="wide")
-    init_db()
+    
+    # Initialize DB on startup
+    try:
+        init_db()
+    except Exception as e:
+        st.error(f"Critical Database Error: {e}")
+        st.stop()
+    
     inject_css()
 
     if "logged_in" not in st.session_state:
@@ -397,7 +432,11 @@ def main():
 
             sentiment_result = analyze_sentiment(st.session_state.answers)
 
-            save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
+            try:
+                save_assessment(st.session_state.user_id, st.session_state.department, total_score, category, st.session_state.answers, ai_text)
+            except Exception as e:
+                st.error(f"Failed to save your check-in: {e}")
+                st.stop()
 
             st.session_state.processing = False
             st.divider()
@@ -474,10 +513,8 @@ def main():
         admin_password = st.text_input("Admin Password", type="password")
 
         try:
-            # Security: Get password from environment variable, not hardcoded
             expected_password = os.environ.get("ADMIN_PASSWORD")
         except:
-            # Fallback for local testing if env var is missing (but warn user)
             expected_password = None
 
         if admin_password == "":
