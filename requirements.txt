@@ -1,10 +1,4 @@
 streamlit
 pandas
 numpy
-requests
-plotly
-transformers
-torch
-huggingface_hub
-sentence-transformers
-python-dotenv
+google-generativeai
