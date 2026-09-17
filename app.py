@@ -243,7 +243,7 @@ def get_gemini_response(system_prompt: str, user_prompt: str) -> str | None:
             full_prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=500
+                max_output_tokens=1500
             )
         )
 
@@ -266,7 +266,7 @@ the officer as a professional who serves under real operational stress —
 never as a "patient". You NEVER diagnose. You validate their service and
 their feelings, then offer 2-3 concrete, actionable grounding or
 tactical-reset techniques (e.g. box breathing, grounding exercises,
-post-shift decompression routines). Keep the response under 220 words,
+post-shift decompression routines). Keep the response under 300 words,
 in plain conversational English (a few Hindi words like "himmat" or
 "seva" are welcome if natural, but do not overdo it).
 
